@@ -1,0 +1,40 @@
+# Local/private Obsidian content
+Daily_Logs/
+Subject/
+Subject_Hierarchical/
+_Generated/
+Topic_Reviews/
+Topic_Reviews_Hierarchical/
+_Legacy_Backup/
+attachments/
+.obsidian/
+
+# Secrets and local environment
+scripts/.env
+.env
+
+# Generated runtime data
+scripts/organizer_metadata.json
+scripts/organizer_metadata_hierarchical.json
+scripts/cloudinary_cache.json
+scripts/notion_sync_state.json
+scripts/notion_sync_state_hierarchical.json
+scripts/source_id_backups/
+scripts/.runtime/
+scripts/__pycache__/
+__pycache__/
+*.pyc
+scripts/reports/
+runtime/python/
+
+# Local agent/tooling state
+.agents/
+.codex/
+.gemini/
+
+# OS/editor noise
+Thumbs.db
+Desktop.ini
+.DS_Store
+*.zip
+!runtime/*.zip

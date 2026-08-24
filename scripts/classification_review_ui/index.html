@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title data-i18n="pageTitle">Log2Topic Classification Review</title>
+  <link rel="stylesheet" href="/dashboard.css">
+</head>
+<body>
+  <header class="app-header">
+    <div>
+      <div class="brand">Log2Topic</div>
+      <h1 data-i18n="heading">Classification Review</h1>
+    </div>
+    <div class="header-actions">
+      <div class="review-count" aria-live="polite"><strong id="reviewCount">0</strong><span data-i18n="waiting">waiting</span></div>
+      <button class="secondary-button" id="refreshButton" type="button" data-i18n="refresh">Refresh</button>
+    </div>
+  </header>
+
+  <nav class="filter-bar" aria-label="Review type" data-i18n-aria="reviewType">
+    <button class="filter-button active" type="button" data-filter="all"><span data-i18n="all">All</span> <span id="countAll">0</span></button>
+    <button class="filter-button" type="button" data-filter="missing-level-1"><span data-i18n="missingLevel1">Missing Level 1</span> <span id="countMissing">0</span></button>
+    <button class="filter-button" type="button" data-filter="parent-category"><span data-i18n="parentStop">Stopped at parent</span> <span id="countParent">0</span></button>
+    <button class="filter-button" type="button" data-filter="invalid-manual"><span data-i18n="invalidManual">Invalid manual path</span> <span id="countInvalid">0</span></button>
+  </nav>
+
+  <main class="app-shell">
+    <aside class="review-queue" aria-label="Review queue" data-i18n-aria="reviewQueue">
+      <div class="queue-header">
+        <label for="reviewSearch" data-i18n="reviewQueue">Review queue</label>
+        <input id="reviewSearch" type="search" placeholder="Search title or source path" data-i18n-placeholder="reviewSearch">
+      </div>
+      <ol id="reviewList" class="review-list"></ol>
+    </aside>
+
+    <section id="emptyState" class="empty-state">
+      <h2 data-i18n="emptyTitle">Nothing to review</h2>
+      <p data-i18n="emptyBody">No classification review items match this filter.</p>
+    </section>
+
+    <section id="reviewWorkspace" class="review-workspace" hidden>
+      <div class="workspace-header">
+        <div class="workspace-title">
+          <div id="sourceBreadcrumb" class="breadcrumb"></div>
+          <h2 id="sourceHeading"></h2>
+          <div id="sourceLocation" class="source-location"></div>
+        </div>
+        <div id="reviewReasons" class="reason-list"></div>
+      </div>
+
+      <div class="workspace-grid">
+        <section class="source-pane" aria-labelledby="sourcePaneTitle">
+          <div class="pane-header">
+            <h3 id="sourcePaneTitle" data-i18n="sourceSection">Source section</h3>
+            <span id="staleIndicator" class="stale-indicator" hidden data-i18n="sourceChanged">Source changed</span>
+          </div>
+          <pre id="sourceContent" class="source-content"></pre>
+        </section>
+
+        <aside class="category-pane" aria-labelledby="categoryPaneTitle">
+          <div class="pane-header category-header">
+            <div>
+              <h3 id="categoryPaneTitle" data-i18n="categoryPaths">Category paths</h3>
+              <span id="selectedCount" class="selected-count">0 selected</span>
+            </div>
+            <button class="text-button" id="clearSelectionButton" type="button" data-i18n="clear">Clear</button>
+          </div>
+          <label class="category-search-label" for="categorySearch" data-i18n="pathSearchLabel">Path search</label>
+          <input id="categorySearch" class="category-search" type="search" placeholder="Search category name" data-i18n-placeholder="categorySearch">
+          <div id="categoryList" class="category-list"></div>
+          <div id="actionMessage" class="action-message" aria-live="polite"></div>
+          <button class="primary-button" id="applyButton" type="button" disabled data-i18n="apply">Apply selected categories</button>
+        </aside>
+      </div>
+    </section>
+  </main>
+
+  <script src="/dashboard.js"></script>
+</body>
+</html>
