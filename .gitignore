@@ -1,12 +1,14 @@
-# Local/private Obsidian content
-Daily_Logs/
-Subject/
-Subject_Hierarchical/
-_Generated/
-Topic_Reviews/
-Topic_Reviews_Hierarchical/
-_Legacy_Backup/
-attachments/
+# Local workspace content
+/Workspace/Daily_Logs/*
+!/Workspace/Daily_Logs/.gitkeep
+/Workspace/Subject/
+/Workspace/Subject_Hierarchical/
+/Workspace/_Generated/
+/Workspace/Topic_Reviews/
+/Workspace/Topic_Reviews_Hierarchical/
+/Workspace/_Legacy_Backup/
+/Workspace/attachments/*
+!/Workspace/attachments/.gitkeep
 .obsidian/
 
 # Secrets and local environment

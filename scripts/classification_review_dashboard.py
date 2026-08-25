@@ -33,10 +33,11 @@ from process_lock import (
     command_text,
     delegated_lock_environment,
 )
+from workspace_paths import resolve_workspace_dir
 
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-VAULT_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, ".."))
+VAULT_DIR = resolve_workspace_dir(SCRIPT_DIR)
 STATIC_DIR = os.path.join(SCRIPT_DIR, "classification_review_ui")
 METADATA_PATH = os.path.join(SCRIPT_DIR, "organizer_metadata.json")
 RULES_PATH = os.path.join(VAULT_DIR, "Classification_Rules.md")

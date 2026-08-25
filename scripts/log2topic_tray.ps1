@@ -10,6 +10,10 @@ Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
 $vaultRoot = [IO.Path]::GetFullPath((Split-Path -Parent $PSScriptRoot))
+$workspaceRoot = Join-Path $vaultRoot "Workspace"
+if (-not (Test-Path -LiteralPath (Join-Path $workspaceRoot "Classification_Rules.md") -PathType Leaf)) {
+    $workspaceRoot = $vaultRoot
+}
 $runtimeDir = Join-Path $PSScriptRoot ".runtime"
 $configPath = Join-Path $runtimeDir "tray_settings.json"
 $configurationScript = Join-Path $PSScriptRoot "configure_automation.ps1"
@@ -407,7 +411,7 @@ $fullNotionItem.Add_Click({
     Start-InternalBatch -Filename "run_notion_sync.bat"
     Show-Notification -Title "Log2Topic" -Message "전체 Notion 동기화를 시작했습니다."
 })
-$openWorkspaceItem.Add_Click({ Open-PathInExplorer -Path $vaultRoot })
+$openWorkspaceItem.Add_Click({ Open-PathInExplorer -Path $workspaceRoot })
 $openLogsItem.Add_Click({ Open-PathInExplorer -Path (Join-Path $PSScriptRoot "reports") })
 $script:scheduleMenuItem.Enabled = $false
 $settingsItem.Add_Click({ Show-SettingsDialog })

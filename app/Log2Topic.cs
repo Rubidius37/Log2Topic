@@ -155,20 +155,28 @@ namespace Log2TopicDesktop
 
     internal static class WorkspaceBootstrap
     {
+        internal static string ResolvePath(string root)
+        {
+            string bundledWorkspace = Path.Combine(root, "Workspace");
+            string bundledRules = Path.Combine(bundledWorkspace, "Classification_Rules.md");
+            return File.Exists(bundledRules) ? bundledWorkspace : root;
+        }
+
         internal static void Ensure(string root)
         {
-            string rulesPath = Path.Combine(root, "Classification_Rules.md");
+            string workspaceRoot = ResolvePath(root);
+            string rulesPath = Path.Combine(workspaceRoot, "Classification_Rules.md");
             if (!File.Exists(rulesPath))
             {
                 throw new FileNotFoundException(
                     UiText.Get(
-                        "Classification_Rules.md is missing. Restore it from the distribution folder.",
-                        "Classification_Rules.md가 없습니다. 배포 폴더에서 파일을 복원하세요."),
+                        "Classification_Rules.md is missing. Restore it inside Workspace.",
+                        "Classification_Rules.md가 없습니다. Workspace 폴더 안에서 복원하세요."),
                     rulesPath);
             }
 
-            Directory.CreateDirectory(Path.Combine(root, "Daily_Logs"));
-            Directory.CreateDirectory(Path.Combine(root, "attachments"));
+            Directory.CreateDirectory(Path.Combine(workspaceRoot, "Daily_Logs"));
+            Directory.CreateDirectory(Path.Combine(workspaceRoot, "attachments"));
         }
     }
 
@@ -388,6 +396,7 @@ namespace Log2TopicDesktop
     internal sealed class TrayApplicationContext : ApplicationContext
     {
         private readonly string root;
+        private readonly string workspaceRoot;
         private readonly string scriptsRoot;
         private readonly string settingsPath;
         private readonly NotifyIcon notifyIcon;
@@ -401,6 +410,7 @@ namespace Log2TopicDesktop
         internal TrayApplicationContext(string rootPath, bool showSettings = false)
         {
             root = rootPath;
+            workspaceRoot = WorkspaceBootstrap.ResolvePath(root);
             scriptsRoot = Path.Combine(root, "scripts");
             settingsPath = Path.Combine(scriptsRoot, ".runtime", "tray_settings.json");
             ValidateRequiredFiles();
@@ -440,7 +450,7 @@ namespace Log2TopicDesktop
             external.DropDownItems.Add(notion);
             menu.Items.Add(external);
             menu.Items.Add(new ToolStripSeparator());
-            AddMenuItem(UiText.Get("Open workspace", "작업 폴더 열기"), delegate { OpenFolder(root); });
+            AddMenuItem(UiText.Get("Open workspace", "작업 폴더 열기"), delegate { OpenFolder(workspaceRoot); });
             AddMenuItem(UiText.Get("Open run logs", "실행 로그 열기"), delegate { OpenFolder(Path.Combine(scriptsRoot, "reports")); });
             menu.Items.Add(new ToolStripSeparator());
             scheduleSummaryItem = new ToolStripMenuItem(ScheduleSummary(TraySettings.Load(settingsPath)));
@@ -451,7 +461,7 @@ namespace Log2TopicDesktop
             AddMenuItem(UiText.Get("Exit", "종료"), delegate { ExitThread(); });
 
             notifyIcon.ContextMenuStrip = menu;
-            notifyIcon.DoubleClick += delegate { OpenFolder(root); };
+            notifyIcon.DoubleClick += delegate { OpenFolder(workspaceRoot); };
             Notify(UiText.Get("Log2Topic is available from the system tray.", "트레이에서 실행 기능과 자동 동기화 설정을 사용할 수 있습니다."));
 
             if (firstRun)

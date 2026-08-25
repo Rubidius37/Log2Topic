@@ -17,6 +17,7 @@ from image_assets import (
     normalize_image_reference,
     resolve_local_image_path,
 )
+from workspace_paths import resolve_workspace_dir
 from process_lock import (
     LOCK_BUSY_EXIT_CODE,
     ProcessLockUnavailable,
@@ -462,7 +463,7 @@ def _main_unlocked():
 
     args = parse_args()
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    vault_dir = os.path.abspath(os.path.join(script_dir, ".."))
+    vault_dir = resolve_workspace_dir(script_dir)
     env_path = os.path.join(script_dir, ".env")
     cache_path = os.path.join(script_dir, "cloudinary_cache.json")
     report_path = os.path.join(script_dir, "reports", "cloudinary_cleanup_report.md")
@@ -540,7 +541,7 @@ def main():
         return _main_unlocked()
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    vault_dir = os.path.abspath(os.path.join(script_dir, ".."))
+    vault_dir = resolve_workspace_dir(script_dir)
     try:
         with VaultProcessLock(
             vault_dir,

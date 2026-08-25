@@ -90,6 +90,7 @@ from sync_contracts import (
     NOTION_PROP_SYNC_KEY,
     normalize_sync_key_part,
 )
+from workspace_paths import resolve_workspace_dir, resolve_workspace_state_dir
 
 REVIEW_DIR_NAME = "Topic_Reviews"
 LEGACY_REVIEW_PREFIX = "_Generated/Timelines/"
@@ -112,7 +113,10 @@ def load_cloudinary_cache(vault_dir):
     if _cloudinary_cache is not None:
         return _cloudinary_cache
 
-    cache_filepath = os.path.join(vault_dir, "scripts", "cloudinary_cache.json")
+    cache_filepath = os.path.join(
+        resolve_workspace_state_dir(os.path.dirname(os.path.abspath(__file__)), vault_dir),
+        "cloudinary_cache.json",
+    )
     _cloudinary_cache = load_json_state(
         cache_filepath,
         missing_default={},
@@ -122,7 +126,10 @@ def load_cloudinary_cache(vault_dir):
     return _cloudinary_cache
 
 def save_cloudinary_cache(vault_dir, cache_data):
-    cache_filepath = os.path.join(vault_dir, "scripts", "cloudinary_cache.json")
+    cache_filepath = os.path.join(
+        resolve_workspace_state_dir(os.path.dirname(os.path.abspath(__file__)), vault_dir),
+        "cloudinary_cache.json",
+    )
     try:
         atomic_write_json(cache_filepath, cache_data)
     except Exception as e:
@@ -1118,7 +1125,7 @@ def _main_unlocked():
         print("Error: Notion Database ID is not set. Please configure NOTION_DATABASE_ID in .env.")
         sys.exit(1)
 
-    vault_dir = os.path.abspath(os.path.join(script_dir, ".."))
+    vault_dir = resolve_workspace_dir(script_dir)
     metadata_filepath = os.path.join(script_dir, args.metadata_file)
     try:
         sync_state = load_notion_sync_state(script_dir, args.sync_state_file)
@@ -1560,7 +1567,7 @@ def main():
         return _main_unlocked()
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    vault_dir = os.path.abspath(os.path.join(script_dir, ".."))
+    vault_dir = resolve_workspace_dir(script_dir)
     try:
         with VaultProcessLock(
             vault_dir,

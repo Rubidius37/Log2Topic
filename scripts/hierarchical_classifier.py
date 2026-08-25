@@ -20,6 +20,7 @@ from process_lock import (
     lock_is_delegated_by_parent,
     print_lock_error,
 )
+from workspace_paths import resolve_workspace_dir
 
 
 CATEGORY_LEVELS = 5
@@ -1408,7 +1409,7 @@ def _main_unlocked(argv=None):
 
     args = parse_args(argv)
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    vault_dir = os.path.abspath(os.path.join(script_dir, ".."))
+    vault_dir = resolve_workspace_dir(script_dir)
     rules_path = os.path.join(vault_dir, "Classification_Rules.md")
     daily_logs_dir = os.path.join(vault_dir, "Daily_Logs")
     metadata_path = os.path.join(script_dir, args.metadata_file)
@@ -1698,7 +1699,7 @@ def main(argv=None):
         return _main_unlocked(argv)
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    vault_dir = os.path.abspath(os.path.join(script_dir, ".."))
+    vault_dir = resolve_workspace_dir(script_dir)
     if args.production:
         operation = "classification-production"
     elif args.dry_run:

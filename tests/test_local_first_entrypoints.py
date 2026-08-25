@@ -21,13 +21,13 @@ class LocalFirstEntrypointTests(unittest.TestCase):
 
         if is_distribution:
             tracked = subprocess.check_output(
-                ["git", "ls-files", "Classification_Rules.md"],
+                ["git", "ls-files", "Workspace/Classification_Rules.md"],
                 cwd=ROOT_DIR,
                 text=True,
                 encoding="utf-8",
             ).strip()
-            self.assertEqual("Classification_Rules.md", tracked)
-            self.assertNotIn("Classification_Rules.md", ignore_lines)
+            self.assertEqual("Workspace/Classification_Rules.md", tracked)
+            self.assertNotIn("/Workspace/Classification_Rules.md", ignore_lines)
         else:
             self.assertIn("Classification_Rules.md", ignore_lines)
 
@@ -36,9 +36,7 @@ class LocalFirstEntrypointTests(unittest.TestCase):
         excluded_dirs = {
             ".git",
             "__pycache__",
-            "Daily_Logs",
-            "Subject",
-            "Topic_Reviews",
+            "Workspace",
             "source_id_backups",
         }
         text_suffixes = {".bat", ".cs", ".css", ".html", ".js", ".json", ".md", ".ps1", ".py"}
@@ -156,8 +154,9 @@ class LocalFirstEntrypointTests(unittest.TestCase):
 
         self.assertIn("namespace Log2TopicDesktop", app_source)
         self.assertIn("WorkspaceBootstrap.Ensure(root)", app_source)
-        self.assertIn('Path.Combine(root, "Daily_Logs")', app_source)
-        self.assertIn('Path.Combine(root, "attachments")', app_source)
+        self.assertIn('Path.Combine(root, "Workspace")', app_source)
+        self.assertIn('Path.Combine(workspaceRoot, "Daily_Logs")', app_source)
+        self.assertIn('Path.Combine(workspaceRoot, "attachments")', app_source)
         self.assertIn('arguments.Append(" -Language ")', app_source)
         self.assertIn('Join-Path $root "app\\Log2Topic.cs"', build_script)
         self.assertIn("Get-FileHash", build_script)
@@ -184,9 +183,11 @@ class LocalFirstEntrypointTests(unittest.TestCase):
             self.skipTest("Private source workspace does not use distribution setup.")
 
         setup = read_repo_file("setup_workspace.bat")
-        self.assertIn("Classification_Rules.md", setup)
+        self.assertIn("Workspace\\Classification_Rules.md", setup)
         self.assertNotIn("Classification_Rules.example.md", setup)
-        self.assertTrue(os.path.exists(os.path.join(ROOT_DIR, "Classification_Rules.md")))
+        self.assertTrue(
+            os.path.exists(os.path.join(ROOT_DIR, "Workspace", "Classification_Rules.md"))
+        )
         self.assertFalse(os.path.exists(os.path.join(ROOT_DIR, "Classification_Rules.example.md")))
 
     def test_obsolete_root_launchers_are_removed(self):
@@ -211,7 +212,6 @@ class LocalFirstEntrypointTests(unittest.TestCase):
         env_example = read_repo_file("scripts", ".env.example").casefold()
         project_docs = (
             read_repo_file("README.md")
-            + read_repo_file("README.ko.md")
             + read_repo_file("docs", "USER_GUIDE.md")
             + read_repo_file("docs", "SYSTEM_REFERENCE.md")
         ).casefold()
@@ -227,7 +227,6 @@ class LocalFirstEntrypointTests(unittest.TestCase):
         )
         docs = (
             read_repo_file("README.md")
-            + read_repo_file("README.ko.md")
             + read_repo_file("docs", "USER_GUIDE.md")
             + read_repo_file("docs", "SYSTEM_REFERENCE.md")
         ).casefold()
@@ -235,23 +234,21 @@ class LocalFirstEntrypointTests(unittest.TestCase):
 
     def test_readme_uses_local_launcher_as_default(self):
         content = read_repo_file("README.md")
-        korean = read_repo_file("README.ko.md")
 
         self.assertIn("# Log2Topic", content)
-        self.assertNotIn("# Markdown Research Log Organizer", content)
-        self.assertIn("## Daily workflow", content)
-        self.assertIn("personal knowledge wiki", content)
-        self.assertIn("**Optional integrations**", content)
+        self.assertIn("## 평소 사용 방법", content)
+        self.assertIn("개인 지식 위키", content)
+        self.assertIn("## 선택 사항: 외부 서비스", content)
         self.assertIn("Log2Topic.exe", content)
-        self.assertIn("Update local documents", content)
+        self.assertIn("로컬 문서 갱신", content)
         self.assertIn("assets/log2topic.png", content)
-        self.assertIn("[한국어](README.ko.md)", content)
-        self.assertIn("## 평소 사용 방법", korean)
-        self.assertIn("assets/log2topic-tray-menu-ko.png", korean)
+        self.assertIn("Workspace/", content)
+        self.assertNotIn("[English]", content)
+        self.assertNotIn("README.ko.md", content)
+        self.assertIn("assets/log2topic-tray-menu-ko.png", content)
         self.assertTrue(
             os.path.exists(os.path.join(ROOT_DIR, "assets", "log2topic-tray-menu-ko.png"))
         )
-        self.assertIn("## Optional external services", content)
         self.assertIn("### Notion", content)
         self.assertIn("docs/SYSTEM_REFERENCE.md", content)
         self.assertIn("docs/NOTION_INTEGRATION.md", content)
@@ -262,7 +259,6 @@ class LocalFirstEntrypointTests(unittest.TestCase):
 
     def test_feedback_channel_and_issue_templates_are_distributed(self):
         readme = read_repo_file("README.md")
-        korean = read_repo_file("README.ko.md")
         bug_template = read_repo_file(
             ".github", "ISSUE_TEMPLATE", "01-bug.yml"
         )
@@ -273,10 +269,9 @@ class LocalFirstEntrypointTests(unittest.TestCase):
             ".github", "ISSUE_TEMPLATE", "config.yml"
         )
 
-        self.assertIn("## Feedback and issues", readme)
+        self.assertIn("## 피드백과 문제 제보", readme)
         self.assertIn("GitHub `Issues`", readme)
-        self.assertIn("## 피드백과 문제 제보", korean)
-        self.assertIn("연구자료와 인증정보", korean)
+        self.assertIn("연구자료와 인증정보", readme)
         self.assertIn("name: 버그 제보", bug_template)
         self.assertIn("id: steps", bug_template)
         self.assertIn("name: 기능 제안", feature_template)
@@ -349,41 +344,38 @@ class LocalFirstEntrypointTests(unittest.TestCase):
 
     def test_detailed_reference_documents_exist(self):
         user_guide = read_repo_file("docs", "USER_GUIDE.md")
-        korean_user_guide = read_repo_file("docs", "USER_GUIDE.ko.md")
         system_reference = read_repo_file("docs", "SYSTEM_REFERENCE.md")
-        korean_system_reference = read_repo_file("docs", "SYSTEM_REFERENCE.ko.md")
         notion_reference = read_repo_file("docs", "NOTION_INTEGRATION.md")
-        korean_notion_reference = read_repo_file("docs", "NOTION_INTEGRATION.ko.md")
 
-        self.assertIn("## Configure a Markdown editor", user_guide)
-        self.assertIn("## Troubleshooting", user_guide)
+        self.assertIn("## Markdown 편집기 설정", user_guide)
+        self.assertIn("## 문제 해결", user_guide)
         self.assertIn("## Source ID", system_reference)
-        self.assertIn("## Process lock", system_reference)
-        self.assertIn("## Sync Key and page updates", notion_reference)
-        self.assertIn("## Retries and partial failure", notion_reference)
-        self.assertIn("## Markdown 편집기 설정", korean_user_guide)
-        self.assertIn("## 동시 실행 잠금", korean_system_reference)
-        self.assertIn("## Sync Key와 페이지 갱신", korean_notion_reference)
+        self.assertIn("## 동시 실행 잠금", system_reference)
+        self.assertIn("## Sync Key와 페이지 갱신", notion_reference)
+        self.assertIn("## 재시도와 부분 실패", notion_reference)
 
-    def test_document_language_variants_and_relative_links(self):
+    def test_korean_documents_and_relative_links(self):
         documents = (
             "README.md",
-            "README.ko.md",
             "docs/USER_GUIDE.md",
-            "docs/USER_GUIDE.ko.md",
             "docs/NOTION_INTEGRATION.md",
-            "docs/NOTION_INTEGRATION.ko.md",
             "docs/SYSTEM_REFERENCE.md",
-            "docs/SYSTEM_REFERENCE.ko.md",
+            "Workspace/Classification_Rules.md",
+            "runtime/PYTHON_RUNTIME.md",
         )
-        self.assertIn("[한국어](USER_GUIDE.ko.md)", read_repo_file("docs", "USER_GUIDE.md"))
-        self.assertIn("[English](USER_GUIDE.md)", read_repo_file("docs", "USER_GUIDE.ko.md"))
-        self.assertIn("docs/USER_GUIDE.ko.md", read_repo_file("README.ko.md"))
+        for removed_document in (
+            "README.ko.md",
+            "docs/USER_GUIDE.ko.md",
+            "docs/NOTION_INTEGRATION.ko.md",
+            "docs/SYSTEM_REFERENCE.ko.md",
+        ):
+            self.assertFalse(os.path.exists(os.path.join(ROOT_DIR, removed_document)))
 
         for relative_document in documents:
             document_path = os.path.join(ROOT_DIR, relative_document)
             document_dir = os.path.dirname(document_path)
             content = read_repo_file(*relative_document.split("/"))
+            self.assertNotIn("[English]", content, relative_document)
             for raw_target in re.findall(r"!?\[[^\]]*\]\(([^)]+)\)", content):
                 target = raw_target.strip("<>").split("#", 1)[0]
                 if not target or "://" in target or target.startswith("mailto:"):

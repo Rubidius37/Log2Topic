@@ -1,62 +1,16 @@
-# Classification Rules / 분류 규칙
+# 분류 규칙
 
-The table below is the actual classification configuration. **Keep all six columns and their order unchanged.** To add a new Level 1 category, add a row with its name in the first column. Instructions are provided below the table in [English](#how-to-use) and [Korean](#사용-방법).
+아래 표가 실제 자동 분류 규칙입니다. **표의 여섯 열과 열 순서는 바꾸지 마세요.** 새 Level 1은 첫 번째 열에 이름을 적은 행을 추가하면 됩니다. 자세한 작성 방법은 표 아래에서 확인할 수 있습니다.
 
-## Active rules / 실제 분류 규칙
+## 실제 분류 규칙
 
-| 대분류 (Level 1) | 중분류 (Level 2) | 소분류 (Level 3) | 상세 분류 (Level 4) | 세부 태스크 (Level 5) | 매칭 키워드 (commas: OR, spaces: AND) |
+| 대분류 (Level 1) | 중분류 (Level 2) | 소분류 (Level 3) | 상세 분류 (Level 4) | 세부 태스크 (Level 5) | 매칭 키워드 (쉼표: OR, 띄어쓰기: AND) |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | Projects | Sample Project | Planning | Requirements | | requirement, plan |
 | | | Testing | Functional Test | | functional test |
 | | | | Regression Test | | regression test |
 | Knowledge | Methods | Data Analysis | | | analysis, dataset |
 | | References | | | | reference, document |
-
-## How to use
-
-This file maps headings in a daily log to category paths. Start with these three rules:
-
-1. Match headings `#` through `#####` to category names at Level 1 through Level 5.
-2. When a heading exactly matches a category name, no keyword is required.
-3. After adding a path, select `Update local documents` from the Log2Topic tray and check the result.
-
-### Classify with headings
-
-| Rule level | Heading in a log |
-| :--- | :--- |
-| Level 1 | `#` |
-| Level 2 | `##` |
-| Level 3 | `###` |
-| Level 4 | `####` |
-| Level 5 | `#####` |
-
-For example, these headings classify the section as `Projects > Sample Project > Testing > Functional Test`. The names are fictional examples.
-
-```markdown
-# Projects
-## Sample Project
-### Testing
-#### Functional Test
-```
-
-A blank Level cell inherits the value from the row above. When adding another child under the same parent, leave repeated parent cells blank. Enter a value in the first column only when starting a new Level 1 branch.
-
-### Add keywords only when needed
-
-`Matching keywords` are optional. Use them only to infer a deeper category when the source headings stop before that level.
-
-- Comma-separated entries use OR. `failure, error, 실패` matches any one entry.
-- Words separated by spaces inside one entry use AND. `test result` requires both `test` and `result`.
-- Prefer specific part numbers, signal names, and measurement names over short general terms.
-- When the same child name exists under different Level 2 branches, include the parent identifier in the keyword.
-
-### Classification boundaries
-
-- A recognized H1 fixes the Level 1 scope. Keywords in that section cannot cross into another Level 1 branch.
-- H2-H5 extend the path only when a category with the same name exists under the current parent. Other headings remain document structure.
-- A new section without a recognized H1 is preserved under `Unclassified/Missing Level 1` instead of being guessed.
-- To connect one section to several Level 1 branches, specify multiple full paths with `Category:` in the source.
-- A previous Level 1 boundary is inherited only when `organizer_metadata.json` identifies exactly one prior category.
 
 ## 사용 방법
 
