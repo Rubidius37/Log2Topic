@@ -22,7 +22,8 @@ $requiredLaunchers = @(
     "run_local.bat",
     "run_classification_review_dashboard.bat",
     "run_notion_daily_sync.bat",
-    "run_notion_sync.bat"
+    "run_notion_sync.bat",
+    "run_local_rebuild.bat"
 )
 $dayDefinitions = @(
     [PSCustomObject]@{ Value = "Monday"; Label = "월" },

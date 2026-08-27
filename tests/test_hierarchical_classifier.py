@@ -28,6 +28,7 @@ from hierarchical_classifier import (  # noqa: E402
     parse_args,
     persist_source_marker_plans,
     render_source_id_markers,
+    rebuild_source_id_markers,
     resolve_source_id,
     should_persist_source_ids,
     source_unit_fingerprint,
@@ -482,6 +483,35 @@ class HierarchicalClassifierTests(unittest.TestCase):
                 indexes,
                 used_ids,
             )
+
+    def test_rebuild_source_id_markers_backs_up_and_removes_duplicates(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            daily_logs_dir = os.path.join(temp_dir, "Daily_Logs")
+            backup_root = os.path.join(temp_dir, "scripts", "source_id_backups")
+            os.makedirs(daily_logs_dir)
+            source_path = os.path.join(daily_logs_dir, "note.md")
+            original = (
+                "## First\n"
+                "<!-- research-notes-source-id: abcdef1234567890 -->\n"
+                "one\n\n"
+                "## Second\n"
+                "<!-- research-notes-source-id: abcdef1234567890 -->\n"
+                "two\n"
+            )
+            with open(source_path, "w", encoding="utf-8", newline="") as file_obj:
+                file_obj.write(original)
+
+            changed, backup_path = rebuild_source_id_markers(
+                daily_logs_dir,
+                temp_dir,
+                backup_root,
+            )
+
+            with open(source_path, "r", encoding="utf-8", newline="") as file_obj:
+                self.assertNotIn("research-notes-source-id", file_obj.read())
+            with open(os.path.join(backup_path, "Daily_Logs", "note.md"), "r", encoding="utf-8") as file_obj:
+                self.assertEqual(file_obj.read(), original)
+            self.assertEqual(changed, 1)
 
     def test_multi_file_conflict_rolls_back_already_persisted_file(self):
         first_path = self.write_log("# Knowledge\nfirst\n", name="first.md")

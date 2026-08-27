@@ -427,6 +427,10 @@ namespace Log2TopicDesktop
             notifyIcon.Visible = true;
 
             menu = new ContextMenuStrip();
+                AddMenuItem(UiText.Get("Rebuild after replacing source logs", "원본 일지 교체 후 ID 재생성"), delegate
+                {
+                    StartBatch("run_local_rebuild.bat", string.Empty, false);
+                });
             AddMenuItem(UiText.Get("Update local documents", "로컬 문서 갱신"), delegate
             {
                 StartBatch("run_local.bat", string.Empty, false);
@@ -496,7 +500,8 @@ namespace Log2TopicDesktop
             string[] names =
             {
                 "run_local.bat", "run_classification_review_dashboard.bat",
-                "run_notion_daily_sync.bat", "run_notion_sync.bat", "configure_automation.ps1"
+                "run_notion_daily_sync.bat", "run_notion_sync.bat", "run_local_rebuild.bat",
+                "configure_automation.ps1"
             };
             foreach (string name in names)
             {

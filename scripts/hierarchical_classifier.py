@@ -904,6 +904,45 @@ def persist_source_marker_plans(plans, backup_root, vault_dir, dry_run=False):
     return total, heading_count, document_root_count, normalized_count, batch_backup_root
 
 
+def rebuild_source_id_markers(daily_logs_dir, vault_dir, backup_root):
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    batch_backup_root = os.path.join(backup_root, "rebuild", timestamp)
+    changed = 0
+    try:
+        for root, dirnames, filenames in os.walk(daily_logs_dir):
+            dirnames.sort()
+            for filename in sorted(filenames):
+                if not filename.casefold().endswith(".md"):
+                    continue
+                filepath = os.path.join(root, filename)
+                with open(filepath, "r", encoding="utf-8", newline="") as file_obj:
+                    original_content = file_obj.read()
+                rebuilt_content = SOURCE_ID_RE.sub("", original_content)
+                if rebuilt_content == original_content:
+                    continue
+                relative_path = os.path.relpath(filepath, vault_dir)
+                backup_path = os.path.join(batch_backup_root, relative_path)
+                os.makedirs(os.path.dirname(backup_path), exist_ok=True)
+                shutil.copy2(filepath, backup_path)
+                atomic_replace_text(filepath, rebuilt_content, stat_source=backup_path)
+                changed += 1
+    except Exception:
+        if os.path.isdir(batch_backup_root):
+            for root, _dirnames, filenames in os.walk(batch_backup_root):
+                for filename in filenames:
+                    backup_path = os.path.join(root, filename)
+                    relative_path = os.path.relpath(backup_path, batch_backup_root)
+                    with open(backup_path, "r", encoding="utf-8", newline="") as file_obj:
+                        backup_content = file_obj.read()
+                    atomic_replace_text(
+                        os.path.join(vault_dir, relative_path),
+                        backup_content,
+                        stat_source=backup_path,
+                    )
+        raise
+    return changed, batch_backup_root
+
+
 def make_target_filename(log_name, title, source_id, claimed_paths, category_path):
     date_prefix = extract_date_prefix(log_name)
     safe_title = sanitize_filename(title)
@@ -1341,6 +1380,14 @@ def parse_args(argv=None):
             "This weakens identity stability for new source units."
         ),
     )
+    parser.add_argument(
+        "--rebuild-source-ids",
+        action="store_true",
+        help=(
+            "Back up and remove existing Source ID comments before production "
+            "classification, for replacing a source-log corpus."
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -1469,6 +1516,21 @@ def _main_unlocked(argv=None):
     source_id_normalized_marker_count = 0
     source_id_existing_marker_count = 0
     source_id_backup_batch = None
+    rebuild_backup_batch = None
+    if args.rebuild_source_ids:
+        if not args.production:
+            print("Error: --rebuild-source-ids requires --production.")
+            return 2
+        try:
+            rebuilt_count, rebuild_backup_batch = rebuild_source_id_markers(
+                daily_logs_dir,
+                vault_dir,
+                source_id_backup_root,
+            )
+            print(f"Rebuilt Source ID markers in {rebuilt_count} source files.")
+        except Exception as exc:
+            print(f"Error: Source ID rebuild failed: {exc}")
+            return 2
     if persist_source_ids:
         try:
             marker_plans, source_id_existing_marker_count = build_source_marker_plans(
@@ -1681,6 +1743,11 @@ def _main_unlocked(argv=None):
             print(
                 "Source ID backups: "
                 f"{normalize_rel_path(os.path.relpath(source_id_backup_batch, vault_dir))}"
+            )
+        if rebuild_backup_batch:
+            print(
+                "Rebuild backups: "
+                f"{normalize_rel_path(os.path.relpath(rebuild_backup_batch, vault_dir))}"
             )
     print(f"Review files: {len(review_paths)}")
     if deleted:
