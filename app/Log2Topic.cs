@@ -429,11 +429,11 @@ namespace Log2TopicDesktop
             menu = new ContextMenuStrip();
                 AddMenuItem(UiText.Get("Rebuild after replacing source logs", "원본 일지 교체 후 ID 재생성"), delegate
                 {
-                    StartBatch("run_local_rebuild.bat", string.Empty, false);
+                    StartBatch("run_local_rebuild.bat", "--nopause", false);
                 });
             AddMenuItem(UiText.Get("Update local documents", "로컬 문서 갱신"), delegate
             {
-                StartBatch("run_local.bat", string.Empty, false);
+                StartBatch("run_local.bat", "--nopause", false);
                 Notify(UiText.Get("Updating local documents.", "로컬 문서 갱신을 시작했습니다."));
             });
             AddMenuItem(UiText.Get("Open classification review", "분류 검토 대시보드 열기"), delegate
@@ -446,12 +446,12 @@ namespace Log2TopicDesktop
             ToolStripMenuItem notion = new ToolStripMenuItem("Notion");
             notion.DropDownItems.Add(CreateMenuItem(UiText.Get("Sync recent logs", "최근 일지 동기화"), delegate
             {
-                StartBatch("run_notion_daily_sync.bat", string.Empty, false);
+                StartBatch("run_notion_daily_sync.bat", "--nopause", false);
                 Notify(UiText.Get("Syncing recent logs to Notion.", "최근 일지 Notion 동기화를 시작했습니다."));
             }));
             notion.DropDownItems.Add(CreateMenuItem(UiText.Get("Full sync", "전체 동기화"), delegate
             {
-                StartBatch("run_notion_sync.bat", string.Empty, false);
+                StartBatch("run_notion_sync.bat", "--nopause", false);
                 Notify(UiText.Get("Starting full Notion sync.", "전체 Notion 동기화를 시작했습니다."));
             }));
             external.DropDownItems.Add(notion);

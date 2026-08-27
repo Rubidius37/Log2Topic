@@ -27,7 +27,10 @@ jobs:
           $source = Get-Content .\app\Log2Topic.cs -Raw
           $source = $source -replace 'AssemblyVersion\("[^"]+"\)', ('AssemblyVersion("' + $version + '.0")')
           $source = $source -replace 'AssemblyFileVersion\("[^"]+"\)', ('AssemblyFileVersion("' + $version + '.0")')
-          Set-Content .\app\Log2Topic.cs -Value $source -Encoding UTF8
+          [IO.File]::WriteAllText(
+            (Join-Path $env:GITHUB_WORKSPACE "app\Log2Topic.cs"),
+            $source,
+            (New-Object Text.UTF8Encoding($true)))
           .\scripts\build_windows_app.ps1
 
       - name: Create release package
