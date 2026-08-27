@@ -1,13 +1,13 @@
-# Windows automatic updates
+# Windows 자동 업데이트
 
-Log2Topic checks the latest GitHub Release shortly after the tray starts and then every six hours. A manual check is also available from the tray menu.
+Log2Topic은 트레이가 시작된 후 잠시 뒤 GitHub의 최신 릴리스를 확인하고, 이후 6시간마다 다시 확인합니다. 트레이 메뉴에서 수동으로 업데이트를 확인할 수도 있습니다.
 
-Releases must contain an asset named `Log2Topic-windows.zip`. The updater verifies the asset SHA-256 digest when GitHub provides one, replaces application files, preserves `Workspace`, `runtime`, and `scripts/.runtime`, then starts the tray again.
+릴리스에는 `Log2Topic-windows.zip`이라는 파일이 포함되어 있어야 합니다. GitHub에서 SHA-256 다이제스트를 제공하면 업데이트 프로그램이 이를 검증합니다. 그 후 애플리케이션 파일을 교체하고 `Workspace`, `runtime`, `scripts/.runtime` 폴더는 유지한 뒤 트레이를 다시 시작합니다.
 
-To publish a release:
+릴리스를 배포하려면:
 
-1. Update the source and commit the changes.
-2. Create and push a semantic-version tag, for example `v1.0.1`.
-3. GitHub Actions builds the Windows executable and publishes `Log2Topic-windows.zip`.
+1. 소스 코드를 수정하고 변경 사항을 커밋합니다.
+2. `v1.0.1`과 같은 시맨틱 버전 태그를 만들고 푸시합니다.
+3. GitHub Actions가 Windows 실행 파일을 빌드하고 `Log2Topic-windows.zip`을 게시합니다.
 
-The first release containing the updater must be installed manually. Later releases can update existing installations automatically. The updater log is written to `scripts/.runtime/update.log`.
+업데이트 프로그램이 처음 포함된 릴리스는 수동으로 설치해야 합니다. 이후 릴리스부터는 기존 설치본을 자동으로 업데이트할 수 있습니다. 업데이트 로그는 `scripts/.runtime/update.log`에 기록됩니다.
