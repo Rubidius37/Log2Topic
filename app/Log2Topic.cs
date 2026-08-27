@@ -423,7 +423,7 @@ namespace Log2TopicDesktop
             string iconPath = Path.Combine(root, "assets", "log2topic.ico");
             customIcon = File.Exists(iconPath) ? new Icon(iconPath) : null;
             notifyIcon.Icon = customIcon ?? SystemIcons.Application;
-            notifyIcon.Text = "Log2Topic";
+            notifyIcon.Text = "Log2Topic v" + typeof(Program).Assembly.GetName().Version.ToString(3);
             notifyIcon.Visible = true;
 
             menu = new ContextMenuStrip();
@@ -581,7 +581,11 @@ namespace Log2TopicDesktop
                     foreach (object rawAsset in (object[])release["assets"])
                     {
                         Dictionary<string, object> asset = rawAsset as Dictionary<string, object>;
-                        if (asset != null && string.Equals(Convert.ToString(asset["name"]), "Log2Topic-windows.zip", StringComparison.OrdinalIgnoreCase))
+                        string assetName = asset == null ? string.Empty : Convert.ToString(asset["name"]);
+                        if (asset != null &&
+                            (string.Equals(assetName, "Log2Topic-windows.zip", StringComparison.OrdinalIgnoreCase) ||
+                             (assetName.StartsWith("Log2Topic-windows-v", StringComparison.OrdinalIgnoreCase) &&
+                              assetName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))))
                         {
                             updateAsset = asset;
                             break;
