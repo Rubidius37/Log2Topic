@@ -698,6 +698,35 @@ class ParallelRootSyncTests(unittest.TestCase):
 
             upload.assert_not_called()
 
+    def test_cloudinary_resolves_parent_relative_attachment_reference(self):
+        with tempfile.TemporaryDirectory() as vault_dir:
+            attachments_dir = os.path.join(vault_dir, "attachments")
+            os.makedirs(attachments_dir)
+            image_path = os.path.join(attachments_dir, "pasted.png")
+            with open(image_path, "wb") as file_obj:
+                file_obj.write(PNG_HEADER + b"attachment")
+
+            with patch.object(
+                sync_to_notion,
+                "get_or_upload_cloudinary_image",
+                return_value="https://cloudinary.example/pasted.png",
+            ) as upload:
+                block = sync_to_notion.create_image_block(
+                    "../../attachments/pasted.png",
+                    None,
+                    vault_dir=vault_dir,
+                    cloudinary_config={
+                        "cloud_name": "cloud",
+                        "upload_preset": "preset",
+                    },
+                )
+
+            self.assertEqual(
+                block["image"]["external"]["url"],
+                "https://cloudinary.example/pasted.png",
+            )
+            upload.assert_called_once()
+
     def test_cloudinary_rejects_protected_and_non_image_files_before_upload(self):
         with tempfile.TemporaryDirectory() as vault_dir:
             scripts_dir = os.path.join(vault_dir, "scripts")

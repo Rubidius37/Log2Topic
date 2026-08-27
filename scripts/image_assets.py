@@ -80,9 +80,6 @@ def _validate_reference_syntax(reference, normalized):
         raise ImageReferenceError(reference, "local image references cannot use a URL scheme")
 
     parts = _relative_parts(normalized)
-    if ".." in parts:
-        raise ImageReferenceError(reference, "parent-directory traversal is not allowed")
-
     extension = os.path.splitext(parts[-1] if parts else "")[1].casefold()
     if extension not in IMAGE_EXTENSIONS:
         raise ImageReferenceError(reference, "the file extension is not an allowed image type")
