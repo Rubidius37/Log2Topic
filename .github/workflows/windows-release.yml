@@ -24,7 +24,9 @@ jobs:
         run: |
           $version = if ("${{ github.event_name }}" -eq "workflow_dispatch") { "${{ inputs.version }}" } else { "${{ github.ref_name }}".TrimStart("v") }
           if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "Version must use MAJOR.MINOR.PATCH format." }
-          $source = Get-Content .\app\Log2Topic.cs -Raw
+          $source = [IO.File]::ReadAllText(
+            (Join-Path $env:GITHUB_WORKSPACE "app\Log2Topic.cs"),
+            (New-Object Text.UTF8Encoding($false)))
           $source = $source -replace 'AssemblyVersion\("[^"]+"\)', ('AssemblyVersion("' + $version + '.0")')
           $source = $source -replace 'AssemblyFileVersion\("[^"]+"\)', ('AssemblyFileVersion("' + $version + '.0")')
           [IO.File]::WriteAllText(
