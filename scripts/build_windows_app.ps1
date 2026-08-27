@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
-    [switch]$SkipRuntimeDownload
+    [switch]$SkipRuntimeDownload,
+    [string]$OutputPath
 )
 
 Set-StrictMode -Version Latest
@@ -8,7 +9,7 @@ $ErrorActionPreference = "Stop"
 
 $root = [IO.Path]::GetFullPath((Split-Path -Parent $PSScriptRoot))
 $source = Join-Path $root "app\Log2Topic.cs"
-$output = Join-Path $root "Log2Topic.exe"
+$output = if ([string]::IsNullOrWhiteSpace($OutputPath)) { Join-Path $root "Log2Topic.exe" } else { [IO.Path]::GetFullPath($OutputPath) }
 $icon = Join-Path $root "assets\log2topic.ico"
 $runtimeDirectory = Join-Path $root "runtime"
 $pythonVersion = "3.13.15"

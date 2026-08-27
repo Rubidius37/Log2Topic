@@ -1,0 +1,57 @@
+name: Windows release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version without the v prefix"
+        required: true
+        type: string
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Windows app
+        shell: powershell
+        run: |
+          $version = if ("${{ github.event_name }}" -eq "workflow_dispatch") { "${{ inputs.version }}" } else { "${{ github.ref_name }}".TrimStart("v") }
+          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "Version must use MAJOR.MINOR.PATCH format." }
+          $source = Get-Content .\app\Log2Topic.cs -Raw
+          $source = $source -replace 'AssemblyVersion\("[^"]+"\)', ('AssemblyVersion("' + $version + '.0")')
+          $source = $source -replace 'AssemblyFileVersion\("[^"]+"\)', ('AssemblyFileVersion("' + $version + '.0")')
+          Set-Content .\app\Log2Topic.cs -Value $source -Encoding UTF8
+          .\scripts\build_windows_app.ps1
+
+      - name: Create release package
+        shell: powershell
+        run: |
+          $package = Join-Path $env:RUNNER_TEMP "Log2Topic"
+          New-Item -ItemType Directory -Path $package -Force | Out-Null
+          $items = @("Log2Topic.exe", "Log2Topic.bat", "setup_workspace.bat", "app", "assets", "scripts", "runtime", "Workspace\Classification_Rules.md", "README.md", "LICENSE")
+          foreach ($item in $items) {
+            $source = Join-Path $env:GITHUB_WORKSPACE $item
+            $destination = Join-Path $package $item
+            if (Test-Path -LiteralPath $source -PathType Container) {
+              New-Item -ItemType Directory -Path $destination -Force | Out-Null
+              Copy-Item -Path (Join-Path $source "*") -Destination $destination -Recurse -Force
+            }
+            else {
+              New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
+              Copy-Item -LiteralPath $source -Destination $destination -Force
+            }
+          }
+          Remove-Item -LiteralPath (Join-Path $package "scripts\.runtime") -Recurse -Force -ErrorAction SilentlyContinue
+          Compress-Archive -Path (Join-Path $package "*") -DestinationPath (Join-Path $env:RUNNER_TEMP "Log2Topic-windows.zip")
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ runner.temp }}/Log2Topic-windows.zip

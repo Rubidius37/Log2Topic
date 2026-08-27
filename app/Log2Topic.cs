@@ -7,6 +7,7 @@ using System.Drawing;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Net;
 using System.Reflection;
 using System.Globalization;
 using System.Runtime.InteropServices;
@@ -404,7 +405,9 @@ namespace Log2TopicDesktop
         private readonly ToolStripMenuItem scheduleSummaryItem;
         private Icon customIcon;
         private System.Windows.Forms.Timer firstRunTimer;
+        private System.Windows.Forms.Timer updateTimer;
         private BackgroundWorker settingsWorker;
+        private BackgroundWorker updateWorker;
         private bool settingsSaveInProgress;
 
         internal TrayApplicationContext(string rootPath, bool showSettings = false)
@@ -456,12 +459,23 @@ namespace Log2TopicDesktop
             scheduleSummaryItem = new ToolStripMenuItem(ScheduleSummary(TraySettings.Load(settingsPath)));
             scheduleSummaryItem.Enabled = false;
             menu.Items.Add(scheduleSummaryItem);
+            AddMenuItem(UiText.Get("Check for updates", "업데이트 확인"), delegate { CheckForUpdates(true); });
             AddMenuItem(UiText.Get("Automation and sync settings...", "자동 실행 및 동기화 설정..."), delegate { ShowSettings(); });
             menu.Items.Add(new ToolStripSeparator());
             AddMenuItem(UiText.Get("Exit", "종료"), delegate { ExitThread(); });
 
             notifyIcon.ContextMenuStrip = menu;
             notifyIcon.DoubleClick += delegate { OpenFolder(workspaceRoot); };
+            updateTimer = new System.Windows.Forms.Timer();
+            updateTimer.Interval = 30000;
+            updateTimer.Tick += delegate
+            {
+                updateTimer.Stop();
+                updateTimer.Interval = 6 * 60 * 60 * 1000;
+                updateTimer.Start();
+                CheckForUpdates(false);
+            };
+            updateTimer.Start();
             Notify(UiText.Get("Log2Topic is available from the system tray.", "트레이에서 실행 기능과 자동 동기화 설정을 사용할 수 있습니다."));
 
             if (firstRun)
@@ -531,6 +545,110 @@ namespace Log2TopicDesktop
         {
             Directory.CreateDirectory(path);
             Process.Start(new ProcessStartInfo("explorer.exe", "\"" + path + "\"") { UseShellExecute = true });
+        }
+
+        private void CheckForUpdates(bool notifyWhenCurrent)
+        {
+            if (updateWorker != null && updateWorker.IsBusy)
+            {
+                return;
+            }
+
+            updateWorker = new BackgroundWorker();
+            updateWorker.DoWork += delegate(object sender, DoWorkEventArgs eventArgs)
+            {
+                ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
+                using (WebClient client = new WebClient())
+                {
+                    client.Headers[HttpRequestHeader.UserAgent] = "Log2Topic-Updater";
+                    string json = client.DownloadString("https://api.github.com/repos/Rubidius37/Log2Topic/releases/latest");
+                    Dictionary<string, object> release = new JavaScriptSerializer().Deserialize<Dictionary<string, object>>(json);
+                    string tagName = Convert.ToString(release["tag_name"]);
+                    Version latestVersion;
+                    if (!Version.TryParse(tagName.TrimStart('v', 'V'), out latestVersion) ||
+                        latestVersion.CompareTo(typeof(Program).Assembly.GetName().Version) <= 0)
+                    {
+                        eventArgs.Result = notifyWhenCurrent ? "current" : null;
+                        return;
+                    }
+
+                    Dictionary<string, object> updateAsset = null;
+                    foreach (object rawAsset in (object[])release["assets"])
+                    {
+                        Dictionary<string, object> asset = rawAsset as Dictionary<string, object>;
+                        if (asset != null && string.Equals(Convert.ToString(asset["name"]), "Log2Topic-windows.zip", StringComparison.OrdinalIgnoreCase))
+                        {
+                            updateAsset = asset;
+                            break;
+                        }
+                    }
+                    if (updateAsset == null)
+                    {
+                        eventArgs.Result = null;
+                        return;
+                    }
+
+                    string digest = updateAsset.ContainsKey("digest") ? Convert.ToString(updateAsset["digest"]) : string.Empty;
+                    if (digest.StartsWith("sha256:", StringComparison.OrdinalIgnoreCase))
+                    {
+                        digest = digest.Substring(7);
+                    }
+                    eventArgs.Result = new UpdateInfo
+                    {
+                        AssetUrl = Convert.ToString(updateAsset["browser_download_url"]),
+                        ExpectedSha256 = digest
+                    };
+                }
+            };
+            updateWorker.RunWorkerCompleted += delegate(object sender, RunWorkerCompletedEventArgs eventArgs)
+            {
+                updateWorker.Dispose();
+                updateWorker = null;
+                if (eventArgs.Error != null)
+                {
+                    if (notifyWhenCurrent)
+                    {
+                        Notify(UiText.Get("Update check failed.", "업데이트 확인에 실패했습니다."));
+                    }
+                    return;
+                }
+                if (string.Equals(eventArgs.Result as string, "current", StringComparison.Ordinal))
+                {
+                    Notify(UiText.Get("Log2Topic is up to date.", "Log2Topic은 최신 버전입니다."));
+                    return;
+                }
+                UpdateInfo update = eventArgs.Result as UpdateInfo;
+                if (update == null)
+                {
+                    return;
+                }
+                Notify(UiText.Get("A new version is installing.", "새 버전을 설치합니다."));
+                StartUpdater(update.AssetUrl, update.ExpectedSha256);
+                ExitThread();
+            };
+            updateWorker.RunWorkerAsync();
+        }
+
+        private void StartUpdater(string assetUrl, string expectedSha256)
+        {
+            string powershell = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "WindowsPowerShell", "v1.0", "powershell.exe");
+            string updater = Path.Combine(scriptsRoot, "update_windows_app.ps1");
+            string arguments = "-NoProfile -ExecutionPolicy Bypass -File " + Quote(updater) +
+                " -InstallRoot " + Quote(root) + " -AssetUrl " + Quote(assetUrl) +
+                " -ExpectedSha256 " + Quote(expectedSha256) + " -CurrentProcessId " + Process.GetCurrentProcess().Id;
+            Process.Start(new ProcessStartInfo(powershell, arguments)
+            {
+                WorkingDirectory = root,
+                CreateNoWindow = true,
+                UseShellExecute = false,
+                WindowStyle = ProcessWindowStyle.Hidden
+            });
+        }
+
+        private sealed class UpdateInfo
+        {
+            internal string AssetUrl;
+            internal string ExpectedSha256;
         }
 
         private void ShowSettings()
