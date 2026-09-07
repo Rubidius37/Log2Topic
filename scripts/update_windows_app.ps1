@@ -29,6 +29,41 @@ function Get-ArchiveRoot {
     return $extractRoot
 }
 
+function Wait-UpdateProcessExit {
+    param(
+        [int]$ProcessId,
+        [ValidateRange(1, 2147483647)][int]$TimeoutMilliseconds = 30000
+    )
+
+    if ($ProcessId -le 0) {
+        Write-UpdateLog "No application process specified; exit wait skipped."
+        return
+    }
+
+    Write-UpdateLog "Waiting for application process $ProcessId to exit."
+    $timer = [Diagnostics.Stopwatch]::StartNew()
+    while ($true) {
+        try {
+            $process = Get-Process -Id $ProcessId -ErrorAction Stop
+        }
+        catch {
+            # PowerShell 5.1 reports an absent PID as ProcessCommandException.
+            if ($_.FullyQualifiedErrorId -eq "NoProcessFoundForGivenId,Microsoft.PowerShell.Commands.GetProcessCommand") {
+                Write-UpdateLog "Application process $ProcessId is no longer running; exit confirmed."
+                return
+            }
+            throw
+        }
+        $process.Dispose()
+
+        $remaining = $TimeoutMilliseconds - $timer.ElapsedMilliseconds
+        if ($remaining -le 0) {
+            throw "Timed out waiting for application process $ProcessId to exit after $TimeoutMilliseconds ms; files were not replaced."
+        }
+        Start-Sleep -Milliseconds ([int][Math]::Min(200, $remaining))
+    }
+}
+
 function Copy-UpdatedFiles {
     param([string]$SourceRoot)
 
@@ -64,20 +99,17 @@ try {
         }
     }
 
-    if ($CurrentProcessId -gt 0) {
-        try {
-            $process = Get-Process -Id $CurrentProcessId -ErrorAction Stop
-            $process.WaitForExit(30000)
-        }
-        catch [ArgumentException] {
-        }
-    }
+    Wait-UpdateProcessExit -ProcessId $CurrentProcessId
 
+    Write-UpdateLog "Extracting update package."
     New-Item -ItemType Directory -Path $extractRoot -Force | Out-Null
     Expand-Archive -LiteralPath $downloadPath -DestinationPath $extractRoot -Force
+    Write-UpdateLog "Update file replacement started."
     Copy-UpdatedFiles -SourceRoot (Get-ArchiveRoot)
     Write-UpdateLog "Update files installed."
-    Start-Process -FilePath (Join-Path $installRoot "Log2Topic.exe") -WorkingDirectory $installRoot | Out-Null
+    Write-UpdateLog "Restarting application."
+    Start-Process -FilePath (Join-Path $installRoot "Log2Topic.exe") -WorkingDirectory $installRoot -ErrorAction Stop | Out-Null
+    Write-UpdateLog "Application restart requested."
 }
 catch {
     Write-UpdateLog ("Update failed: " + $_.Exception.Message)
