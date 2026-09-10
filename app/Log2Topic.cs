@@ -22,8 +22,8 @@ using System.Windows.Forms;
 [assembly: AssemblyCompany("Log2Topic")]
 [assembly: AssemblyProduct("Log2Topic")]
 [assembly: AssemblyCopyright("Copyright (c) 2026 Log2Topic contributors")]
-[assembly: AssemblyVersion("1.0.0.0")]
-[assembly: AssemblyFileVersion("1.0.0.0")]
+[assembly: AssemblyVersion("1.0.6.0")]
+[assembly: AssemblyFileVersion("1.0.6.0")]
 
 namespace Log2TopicDesktop
 {
@@ -570,15 +570,20 @@ namespace Log2TopicDesktop
                     Dictionary<string, object> release = new JavaScriptSerializer().Deserialize<Dictionary<string, object>>(json);
                     string tagName = Convert.ToString(release["tag_name"]);
                     Version latestVersion;
-                    if (!Version.TryParse(tagName.TrimStart('v', 'V'), out latestVersion) ||
-                        latestVersion.CompareTo(typeof(Program).Assembly.GetName().Version) <= 0)
+                    if (!Version.TryParse(tagName.TrimStart('v', 'V'), out latestVersion))
+                    {
+                        throw new InvalidDataException("Invalid release version: " + tagName);
+                    }
+                    latestVersion = new Version(latestVersion.Major, latestVersion.Minor,
+                        Math.Max(0, latestVersion.Build), Math.Max(0, latestVersion.Revision));
+                    if (latestVersion.CompareTo(typeof(Program).Assembly.GetName().Version) <= 0)
                     {
                         eventArgs.Result = notifyWhenCurrent ? "current" : null;
                         return;
                     }
 
                     Dictionary<string, object> updateAsset = null;
-                    foreach (object rawAsset in (object[])release["assets"])
+                    foreach (object rawAsset in (IEnumerable)release["assets"])
                     {
                         Dictionary<string, object> asset = rawAsset as Dictionary<string, object>;
                         string assetName = asset == null ? string.Empty : Convert.ToString(asset["name"]);
@@ -593,8 +598,7 @@ namespace Log2TopicDesktop
                     }
                     if (updateAsset == null)
                     {
-                        eventArgs.Result = null;
-                        return;
+                        throw new InvalidDataException("The release has no Windows update ZIP asset.");
                     }
 
                     string digest = updateAsset.ContainsKey("digest") ? Convert.ToString(updateAsset["digest"]) : string.Empty;
@@ -615,9 +619,21 @@ namespace Log2TopicDesktop
                 updateWorker = null;
                 if (eventArgs.Error != null)
                 {
+                    try
+                    {
+                        string logDirectory = Path.Combine(scriptsRoot, ".runtime");
+                        Directory.CreateDirectory(logDirectory);
+                        File.AppendAllText(Path.Combine(logDirectory, "update-check.log"),
+                            DateTime.Now.ToString("s") + " " + eventArgs.Error.ToString() + Environment.NewLine);
+                    }
+                    catch (Exception logError)
+                    {
+                        Debug.WriteLine(logError);
+                    }
                     if (notifyWhenCurrent)
                     {
-                        Notify(UiText.Get("Update check failed.", "업데이트 확인에 실패했습니다."));
+                        Notify(UiText.Get("Update check failed. See scripts/.runtime/update-check.log.",
+                            "업데이트 확인에 실패했습니다. scripts/.runtime/update-check.log를 확인하세요."));
                     }
                     return;
                 }

@@ -37,7 +37,10 @@ if errorlevel 1 exit /b 1
 echo 1. Updating local Markdown research notes...
 %PYTHON_CMD% -u "%SCRIPT_DIR%hierarchical_classifier.py" --production --output-dir Subject --review-dir Topic_Reviews --metadata-file organizer_metadata.json %CLASSIFY_ARGS%
 if errorlevel 1 (
-    echo [ERROR] Local update failed. Notion was not changed.
+    echo [WARNING] Local update failed. Syncing original daily notes only.
+    echo [WARNING] Generated notes and all cleanup will be skipped.
+    %PYTHON_CMD% -u "%SCRIPT_DIR%sync_to_notion.py" %SYNC_ARGS% --classification-failed
+    echo [PARTIAL FAILURE] Classification failed. See the sync report for original-note results.
     if not defined NO_PAUSE pause
     exit /b 1
 )

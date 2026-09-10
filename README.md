@@ -156,6 +156,7 @@ Notion 데이터베이스로 일지, 주제 문서와 리뷰를 동기화할 수
 - 일지를 찾지 못하면 `Workspace/Daily_Logs/` 아래의 파일 확장자가 `.md`인지 확인합니다.
 - `[BUSY]`가 나오면 진행 중인 분류나 동기화가 끝난 뒤 다시 실행합니다.
 - Notion 오류는 `scripts/reports/notion_sync_report.md`에서 확인합니다.
+- Source ID 저장 실패와 업데이트 확인 실패는 [오류별 점검 안내](docs/TROUBLESHOOTING.md)를 참고하세요.
 
 더 많은 점검 순서는 [사용자 안내의 문제 해결](docs/USER_GUIDE.md#문제-해결)을 참고하세요.
 

@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from urllib.parse import quote
 
-from atomic_io import StateFileError, atomic_write_json, load_json_state
+from atomic_io import StateFileError, atomic_write_json, load_json_state, filesystem_path
 from process_lock import (
     LOCK_BUSY_EXIT_CODE,
     ProcessLockUnavailable,
@@ -715,6 +715,9 @@ def render_source_id_markers(original_content, markers):
 
 
 def atomic_replace_text(filepath, content, stat_source=None):
+    filepath = filesystem_path(filepath)
+    if stat_source:
+        stat_source = filesystem_path(stat_source)
     directory = os.path.dirname(filepath)
     descriptor, temp_path = tempfile.mkstemp(
         prefix=".research-notes-source-id-",
@@ -827,8 +830,12 @@ def persist_source_marker_plans(plans, backup_root, vault_dir, dry_run=False):
     batch_backup_root = os.path.join(backup_root, "automatic", timestamp)
     prepared = []
     committed = []
+    stage = "prepare"
+    current_source = "(none)"
     try:
         for plan in plans:
+            current_source = plan.source_rel_path
+            stage = "render Source ID markers"
             (
                 updated,
                 inserted,
@@ -849,28 +856,33 @@ def persist_source_marker_plans(plans, backup_root, vault_dir, dry_run=False):
                 batch_backup_root,
                 os.path.relpath(plan.filepath, vault_dir),
             )
-            os.makedirs(os.path.dirname(backup_path), exist_ok=True)
-            shutil.copy2(plan.filepath, backup_path)
+            stage = "back up original"
+            os.makedirs(filesystem_path(os.path.dirname(backup_path)), exist_ok=True)
+            shutil.copy2(filesystem_path(plan.filepath), filesystem_path(backup_path))
 
+            stage = "prepare replacement"
             descriptor, temp_path = tempfile.mkstemp(
                 prefix=".research-notes-source-id-",
                 suffix=".tmp",
-                dir=os.path.dirname(plan.filepath),
+                dir=filesystem_path(os.path.dirname(plan.filepath)),
             )
+            prepared.append((plan, temp_path, backup_path))
             with os.fdopen(descriptor, "w", encoding="utf-8", newline="") as file_obj:
                 file_obj.write(updated)
-            shutil.copystat(plan.filepath, temp_path)
-            prepared.append((plan, temp_path, backup_path))
+            shutil.copystat(filesystem_path(plan.filepath), temp_path)
 
         for plan, temp_path, backup_path in prepared:
-            with open(plan.filepath, "r", encoding="utf-8", newline="") as file_obj:
+            current_source = plan.source_rel_path
+            stage = "check original for concurrent changes"
+            with open(filesystem_path(plan.filepath), "r", encoding="utf-8", newline="") as file_obj:
                 current_content = file_obj.read()
             if current_content != plan.original_content:
                 raise RuntimeError(
                     f"Source file changed before Source IDs were saved: "
                     f"{plan.source_rel_path}"
                 )
-            os.replace(temp_path, plan.filepath)
+            stage = "replace original"
+            os.replace(temp_path, filesystem_path(plan.filepath))
             committed.append((plan, backup_path))
 
     except Exception as exc:
@@ -898,7 +910,8 @@ def persist_source_marker_plans(plans, backup_root, vault_dir, dry_run=False):
             else ""
         )
         raise RuntimeError(
-            f"Failed to persist Source ID markers.{rollback_note}"
+            f"Failed to persist Source ID markers. File: {current_source}; "
+            f"stage: {stage}; {type(exc).__name__}: {exc}.{rollback_note}"
         ) from exc
 
     return total, heading_count, document_root_count, normalized_count, batch_backup_root
@@ -922,16 +935,16 @@ def rebuild_source_id_markers(daily_logs_dir, vault_dir, backup_root):
                     continue
                 relative_path = os.path.relpath(filepath, vault_dir)
                 backup_path = os.path.join(batch_backup_root, relative_path)
-                os.makedirs(os.path.dirname(backup_path), exist_ok=True)
-                shutil.copy2(filepath, backup_path)
+                os.makedirs(filesystem_path(os.path.dirname(backup_path)), exist_ok=True)
+                shutil.copy2(filesystem_path(filepath), filesystem_path(backup_path))
                 atomic_replace_text(filepath, rebuilt_content, stat_source=backup_path)
                 changed += 1
     except Exception:
-        if os.path.isdir(batch_backup_root):
-            for root, _dirnames, filenames in os.walk(batch_backup_root):
+        if os.path.isdir(filesystem_path(batch_backup_root)):
+            for root, _dirnames, filenames in os.walk(filesystem_path(batch_backup_root)):
                 for filename in filenames:
                     backup_path = os.path.join(root, filename)
-                    relative_path = os.path.relpath(backup_path, batch_backup_root)
+                    relative_path = os.path.relpath(backup_path, filesystem_path(batch_backup_root))
                     with open(backup_path, "r", encoding="utf-8", newline="") as file_obj:
                         backup_content = file_obj.read()
                     atomic_replace_text(

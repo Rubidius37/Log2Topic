@@ -423,6 +423,11 @@ def parse_args():
         help="Sync only selected original Daily_Logs notes, then skip generated notes and cleanup.",
     )
     parser.add_argument(
+        "--classification-failed",
+        action="store_true",
+        help="Fallback after classification failure: sync all original notes, skip cleanup, and report partial failure.",
+    )
+    parser.add_argument(
         "--daily",
         nargs="+",
         metavar="PATH",
@@ -547,6 +552,10 @@ def select_original_logs(vault_dir, args):
         args.daily_only or args.daily_paths or args.daily or args.recent_daily is not None
     )
     all_logs = collect_daily_logs(vault_dir)
+    if getattr(args, "classification_failed", False):
+        if not all_logs:
+            raise FileNotFoundError("No Daily_Logs markdown files were found.")
+        return all_logs, True
     if not daily_only_mode:
         return all_logs, False
 
@@ -1169,7 +1178,10 @@ def _main_unlocked():
         sys.exit(1)
 
     if daily_only_mode:
-        print("Fast daily-only sync mode enabled.")
+        if args.classification_failed:
+            print("Classification failed. Syncing ALL original daily notes only; all cleanup is disabled.")
+        else:
+            print("Fast daily-only sync mode enabled.")
         print("Subject notes, Topic_Reviews, and orphan cleanup will be skipped.")
         local_files = []
         timeline_files = []
@@ -1225,7 +1237,10 @@ def _main_unlocked():
             "can sync; pages with local images will fail without broken fallback URLs."
         )
 
-    cloudinary_cleanup_mode = resolve_cloudinary_cleanup_mode(args, daily_only_mode)
+    cloudinary_cleanup_mode = (
+        "off" if args.classification_failed
+        else resolve_cloudinary_cleanup_mode(args, daily_only_mode)
+    )
     if cloudinary_config or cloudinary_cleanup_mode != "off":
         try:
             load_cloudinary_cache(vault_dir)
@@ -1243,6 +1258,16 @@ def _main_unlocked():
 
     url_map = {}
     stage_results = []
+    if args.classification_failed:
+        stage_results.append(SyncStageResult(
+            stage="Classification",
+            expected=1,
+            failures=[SyncFailure(
+                "Classification", "local update",
+                "Local classification failed. Only original daily notes were selected; "
+                "Subject, Review and all cleanup were skipped. See the local update log for the cause.",
+            )],
+        ))
     managed_link_targets = build_managed_wikilink_targets(
         list(original_logs) + list(local_files) + list(timeline_files)
     )
@@ -1299,8 +1324,11 @@ def _main_unlocked():
 
     if daily_only_mode:
         sync_complete = is_sync_run_complete(stage_results)
-        cleanup_status = "not applicable (daily-only mode)"
-        cloudinary_cleanup_ok = run_cloudinary_cleanup_after_sync(
+        cleanup_status = (
+            "skipped because classification failed (Notion and Cloudinary)"
+            if args.classification_failed else "not applicable (daily-only mode)"
+        )
+        cloudinary_cleanup_ok = args.classification_failed or run_cloudinary_cleanup_after_sync(
             args,
             script_dir,
             vault_dir,

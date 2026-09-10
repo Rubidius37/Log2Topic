@@ -7,8 +7,19 @@ class StateFileError(RuntimeError):
     pass
 
 
+def filesystem_path(path):
+    """Use extended Windows paths for I/O without changing stored relative paths."""
+    path = os.fspath(path)
+    if os.name != "nt" or path.startswith("\\\\?\\"):
+        return path
+    absolute = os.path.abspath(path)
+    if absolute.startswith("\\\\"):
+        return "\\\\?\\UNC\\" + absolute[2:]
+    return "\\\\?\\" + absolute
+
+
 def atomic_write_text(path, content, encoding="utf-8"):
-    absolute_path = os.path.abspath(path)
+    absolute_path = filesystem_path(os.path.abspath(path))
     directory = os.path.dirname(absolute_path)
     os.makedirs(directory, exist_ok=True)
     descriptor, temp_path = tempfile.mkstemp(

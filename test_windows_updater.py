@@ -39,6 +39,42 @@ def run_ps(code, timeout=45):
 
 @unittest.skipUnless(os.name == "nt", "Requires Windows PowerShell")
 class UpdaterTests(unittest.TestCase):
+    def test_release_response_parsing_uses_actual_desktop_code(self):
+        source = (PROJECT_ROOT / 'app' / 'Log2Topic.cs').read_text(encoding='utf-8-sig')
+        start = source.index('Dictionary<string, object> release = new JavaScriptSerializer()')
+        end = source.index('ExpectedSha256 = digest', start)
+        end = source.index('};', end) + 2
+        body = source[start:end]
+        harness = '''
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.IO;
+using System.Web.Script.Serialization;
+[assembly: System.Reflection.AssemblyVersion("1.0.5.0")]
+public class Program {
+    public class UpdateInfo { public string AssetUrl; public string ExpectedSha256; }
+    static DoWorkEventArgs eventArgs;
+    static void Parse(string json, bool notifyWhenCurrent) { BODY }
+    public static void Test() {
+        eventArgs = new DoWorkEventArgs(null);
+        Parse("{\\"tag_name\\":\\"v1.0.6\\",\\"assets\\":[{\\"name\\":\\"Log2Topic-windows-v1.0.6.zip\\",\\"browser_download_url\\":\\"https://example.invalid/test.zip\\",\\"digest\\":\\"sha256:abc\\"}]}", true);
+        var info = (UpdateInfo)eventArgs.Result;
+        if (info.ExpectedSha256 != "abc") throw new Exception("Bad digest");
+        eventArgs = new DoWorkEventArgs(null);
+        Parse("{\\"tag_name\\":\\"v1.0.5\\",\\"assets\\":[]}", true);
+        if ((string)eventArgs.Result != "current") throw new Exception("Same version not normalized");
+        bool rejected = false;
+        try { Parse("{\\"tag_name\\":\\"v1.0.6\\",\\"assets\\":[]}", true); }
+        catch (InvalidDataException) { rejected = true; }
+        if (!rejected) throw new Exception("Missing asset not reported");
+    }
+}
+'''.replace('BODY', body)
+        code = "Add-Type -ReferencedAssemblies System.Web.Extensions -TypeDefinition " + quote(harness) + "; [Program]::Test()"
+        self.assert_success(run_ps("$ErrorActionPreference = 'Stop'; " + code))
+
     def run_wait(self, body):
         code = """
 $ErrorActionPreference = 'Stop'
