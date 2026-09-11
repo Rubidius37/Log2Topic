@@ -673,9 +673,9 @@ namespace Log2TopicDesktop
             Process.Start(new ProcessStartInfo(powershell, arguments)
             {
                 WorkingDirectory = root,
-                CreateNoWindow = true,
-                UseShellExecute = false,
-                WindowStyle = ProcessWindowStyle.Hidden
+                CreateNoWindow = false,
+                UseShellExecute = true,
+                WindowStyle = ProcessWindowStyle.Normal
             });
         }
 
