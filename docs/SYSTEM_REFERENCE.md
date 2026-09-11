@@ -39,6 +39,8 @@ Notion 설정은 이 과정에서 읽지 않습니다. 트레이의 `로컬 문�
 
 `Workspace/Subject/`, `Workspace/Topic_Reviews/`, metadata는 다시 생성할 수 있는 결과물입니다. 장기 보관해야 할 원문은 `Workspace/Daily_Logs/`입니다.
 
+Subject 문서를 생성할 때 원본 일지의 이미지 링크는 원본 문서 위치를 기준으로 먼저 해석한 뒤, 생성된 Subject 문서 위치를 기준으로 상대경로를 다시 계산합니다. 따라서 원본이 Obsidian Wikilink(`![[...]]`)인지 Markdown 이미지 링크(`![](...)`)인지와 관계없이 생성 문서에서 `Workspace/attachments/` 이미지를 열 수 있습니다.
+
 ## 계층형 분류 규칙
 
 분류 단계는 다음과 같습니다.
