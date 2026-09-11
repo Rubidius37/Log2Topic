@@ -786,7 +786,12 @@ namespace Log2TopicDesktop
 
         private static string Quote(string value)
         {
-            return "\"" + value.Replace("\"", "\\\"") + "\"";
+            string escaped = value.Replace("\"", "\\\"");
+            if (escaped.EndsWith("\\", StringComparison.Ordinal))
+            {
+                escaped += "\\";
+            }
+            return "\"" + escaped + "\"";
         }
 
         private static string ScheduleSummary(TraySettings settings)
