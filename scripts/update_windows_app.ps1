@@ -3,11 +3,15 @@ param(
     [Parameter(Mandatory = $true)][string]$InstallRoot,
     [Parameter(Mandatory = $true)][string]$AssetUrl,
     [string]$ExpectedSha256,
+    [string]$TargetVersion = "새 버전",
+    [switch]$SkipRestartPrompt,
     [int]$CurrentProcessId = 0
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+
+Add-Type -AssemblyName System.Windows.Forms
 
 $installRoot = [IO.Path]::GetFullPath($InstallRoot)
 $runtimeRoot = Join-Path $installRoot "scripts\.runtime"
@@ -106,13 +110,35 @@ try {
     Expand-Archive -LiteralPath $downloadPath -DestinationPath $extractRoot -Force
     Write-UpdateLog "Update file replacement started."
     Copy-UpdatedFiles -SourceRoot (Get-ArchiveRoot)
-    Write-UpdateLog "Update files installed."
-    Write-UpdateLog "Restarting application."
-    Start-Process -FilePath (Join-Path $installRoot "Log2Topic.exe") -WorkingDirectory $installRoot -ErrorAction Stop | Out-Null
-    Write-UpdateLog "Application restart requested."
+    Write-UpdateLog "Update files installed: $TargetVersion."
+    $restart = $SkipRestartPrompt
+    if (-not $SkipRestartPrompt) {
+        $answer = [Windows.Forms.MessageBox]::Show(
+            "Log2Topic $TargetVersion 설치가 완료되었습니다.`n`n지금 프로그램을 다시 시작하시겠습니까?",
+            "Log2Topic 업데이트 완료",
+            [Windows.Forms.MessageBoxButtons]::YesNo,
+            [Windows.Forms.MessageBoxIcon]::Information)
+        $restart = $answer -eq [Windows.Forms.DialogResult]::Yes
+    }
+    if ($restart) {
+        Write-UpdateLog "Restarting application."
+        Start-Process -FilePath (Join-Path $installRoot "Log2Topic.exe") -WorkingDirectory $installRoot -ErrorAction Stop | Out-Null
+        Write-UpdateLog "Application restart requested."
+    }
+    else {
+        Write-UpdateLog "Update installed; application restart declined."
+    }
 }
 catch {
-    Write-UpdateLog ("Update failed: " + $_.Exception.Message)
+    $failureMessage = $_.Exception.Message
+    Write-UpdateLog ("Update failed: " + $failureMessage)
+    if (-not $SkipRestartPrompt) {
+        [Windows.Forms.MessageBox]::Show(
+            "Log2Topic 업데이트에 실패했습니다.`n`n$failureMessage`n`n자세한 내용: scripts\.runtime\update.log",
+            "Log2Topic 업데이트 오류",
+            [Windows.Forms.MessageBoxButtons]::OK,
+            [Windows.Forms.MessageBoxIcon]::Error) | Out-Null
+    }
     exit 1
 }
 finally {
