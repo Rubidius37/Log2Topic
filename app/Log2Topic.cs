@@ -427,6 +427,11 @@ namespace Log2TopicDesktop
             notifyIcon.Visible = true;
 
             menu = new ContextMenuStrip();
+            ToolStripMenuItem versionItem = new ToolStripMenuItem(
+                UiText.Get("Log2Topic v" + CurrentVersion(), "Log2Topic v" + CurrentVersion()));
+            versionItem.Enabled = false;
+            menu.Items.Add(versionItem);
+            menu.Items.Add(new ToolStripSeparator());
                 AddMenuItem(UiText.Get("Rebuild after replacing source logs", "원본 일지 교체 후 ID 재생성"), delegate
                 {
                     StartBatch("run_local_rebuild.bat", "--nopause", false);
@@ -609,7 +614,8 @@ namespace Log2TopicDesktop
                     eventArgs.Result = new UpdateInfo
                     {
                         AssetUrl = Convert.ToString(updateAsset["browser_download_url"]),
-                        ExpectedSha256 = digest
+                        ExpectedSha256 = digest,
+                        Version = latestVersion
                     };
                 }
             };
@@ -647,26 +653,29 @@ namespace Log2TopicDesktop
                 {
                     return;
                 }
-                Notify(UiText.Get("A new version is installing.", "새 버전을 설치합니다."));
-                StartUpdater(update.AssetUrl, update.ExpectedSha256);
+                Notify(UiText.Get(
+                    "Log2Topic v" + update.Version.ToString(3) + " is installing.",
+                    "Log2Topic v" + update.Version.ToString(3) + " 설치를 시작합니다."));
+                StartUpdater(update.AssetUrl, update.ExpectedSha256, update.Version);
                 ExitThread();
             };
             updateWorker.RunWorkerAsync();
         }
 
-        private void StartUpdater(string assetUrl, string expectedSha256)
+        private void StartUpdater(string assetUrl, string expectedSha256, Version targetVersion)
         {
             string powershell = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "WindowsPowerShell", "v1.0", "powershell.exe");
             string updater = Path.Combine(scriptsRoot, "update_windows_app.ps1");
             string arguments = "-NoProfile -ExecutionPolicy Bypass -File " + Quote(updater) +
                 " -InstallRoot " + Quote(root) + " -AssetUrl " + Quote(assetUrl) +
-                " -ExpectedSha256 " + Quote(expectedSha256) + " -CurrentProcessId " + Process.GetCurrentProcess().Id;
+                " -ExpectedSha256 " + Quote(expectedSha256) + " -TargetVersion " + Quote(targetVersion.ToString(3)) +
+                " -CurrentProcessId " + Process.GetCurrentProcess().Id;
             Process.Start(new ProcessStartInfo(powershell, arguments)
             {
                 WorkingDirectory = root,
-                CreateNoWindow = true,
-                UseShellExecute = false,
-                WindowStyle = ProcessWindowStyle.Hidden
+                CreateNoWindow = false,
+                UseShellExecute = true,
+                WindowStyle = ProcessWindowStyle.Normal
             });
         }
 
@@ -674,6 +683,12 @@ namespace Log2TopicDesktop
         {
             internal string AssetUrl;
             internal string ExpectedSha256;
+            internal Version Version;
+        }
+
+        private static string CurrentVersion()
+        {
+            return typeof(Program).Assembly.GetName().Version.ToString(3);
         }
 
         private void ShowSettings()
@@ -771,7 +786,12 @@ namespace Log2TopicDesktop
 
         private static string Quote(string value)
         {
-            return "\"" + value.Replace("\"", "\\\"") + "\"";
+            string escaped = value.Replace("\"", "\\\"");
+            if (escaped.EndsWith("\\", StringComparison.Ordinal))
+            {
+                escaped += "\\";
+            }
+            return "\"" + escaped + "\"";
         }
 
         private static string ScheduleSummary(TraySettings settings)
