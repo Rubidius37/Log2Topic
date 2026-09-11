@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)][string]$InstallRoot,
     [Parameter(Mandatory = $true)][string]$AssetUrl,
@@ -105,7 +105,7 @@ try {
         Write-Host "2/5 Verifying the downloaded package..."
         $actualHash = (Get-FileHash -LiteralPath $downloadPath -Algorithm SHA256).Hash
         if (-not [string]::Equals($actualHash, $ExpectedSha256, [StringComparison]::OrdinalIgnoreCase)) {
-            throw "Update package SHA-256 mismatch."
+            throw "Update package SHA-256 mismatch. Expected: $ExpectedSha256; actual: $actualHash."
         }
     }
 
