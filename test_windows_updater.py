@@ -54,7 +54,7 @@ using System.IO;
 using System.Web.Script.Serialization;
 [assembly: System.Reflection.AssemblyVersion("1.0.5.0")]
 public class Program {
-    public class UpdateInfo { public string AssetUrl; public string ExpectedSha256; }
+    public class UpdateInfo { public string AssetUrl; public string ExpectedSha256; public Version Version; }
     static DoWorkEventArgs eventArgs;
     static void Parse(string json, bool notifyWhenCurrent) { BODY }
     public static void Test() {
@@ -62,6 +62,7 @@ public class Program {
         Parse("{\\"tag_name\\":\\"v1.0.6\\",\\"assets\\":[{\\"name\\":\\"Log2Topic-windows-v1.0.6.zip\\",\\"browser_download_url\\":\\"https://example.invalid/test.zip\\",\\"digest\\":\\"sha256:abc\\"}]}", true);
         var info = (UpdateInfo)eventArgs.Result;
         if (info.ExpectedSha256 != "abc") throw new Exception("Bad digest");
+        if (info.Version.ToString(3) != "1.0.6") throw new Exception("Bad release version");
         eventArgs = new DoWorkEventArgs(null);
         Parse("{\\"tag_name\\":\\"v1.0.5\\",\\"assets\\":[]}", true);
         if ((string)eventArgs.Result != "current") throw new Exception("Same version not normalized");
@@ -174,7 +175,7 @@ function Start-Process {
 }
 EXTRA
 $hash = (Get-FileHash -LiteralPath ARCHIVE -Algorithm SHA256).Hash
-& SCRIPT -InstallRoot INSTALL -AssetUrl 'https://example.invalid/fixture.zip' -ExpectedSha256 $hash -CurrentProcessId PROCESS_ID
+& SCRIPT -InstallRoot INSTALL -AssetUrl 'https://example.invalid/fixture.zip' -ExpectedSha256 $hash -TargetVersion '1.0.6' -SkipRestartPrompt -CurrentProcessId PROCESS_ID
 if ($LASTEXITCODE) { exit $LASTEXITCODE }
 """
             for key, value in {
