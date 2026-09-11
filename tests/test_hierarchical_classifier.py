@@ -29,6 +29,7 @@ from hierarchical_classifier import (  # noqa: E402
     persist_source_marker_plans,
     render_source_id_markers,
     rebuild_source_id_markers,
+    rewrite_image_links_for_generated_document,
     resolve_source_id,
     should_persist_source_ids,
     source_unit_fingerprint,
@@ -67,6 +68,33 @@ class HierarchicalClassifierTests(unittest.TestCase):
         with open(path, "w", encoding="utf-8") as file_obj:
             file_obj.write(content)
         return path
+
+    def test_generated_document_rewrites_both_image_link_formats(self):
+        source_dir = os.path.join(self.temp_dir.name, "Daily_Logs", "2026-08")
+        attachments_dir = os.path.join(self.temp_dir.name, "attachments")
+        os.makedirs(source_dir)
+        os.makedirs(attachments_dir)
+        source_path = os.path.join(source_dir, "260828 일지.md")
+        image_name = "Pasted image 20260828134722.png"
+        image_path = os.path.join(attachments_dir, image_name)
+        with open(source_path, "w", encoding="utf-8") as file_obj:
+            file_obj.write("")
+        with open(image_path, "wb") as file_obj:
+            file_obj.write(b"image")
+
+        content = (
+            "![](../../attachments/Pasted%20image%2020260828134722.png)\n"
+            "![[Pasted image 20260828134722.png]]"
+        )
+        generated_path = (
+            "Subject/Device Modeling/ICE5QR4770AZ/Active Burst Block/260828.md"
+        )
+        rewritten = rewrite_image_links_for_generated_document(
+            content, source_path, generated_path, self.temp_dir.name
+        )
+
+        expected = "../../../../attachments/Pasted%20image%2020260828134722.png"
+        self.assertEqual(rewritten, f"![]({expected})\n![]({expected})")
 
     def test_inherited_table_builds_full_tree_without_repeating_parents(self):
         self.assertFalse(self.tree.errors)

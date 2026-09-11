@@ -9,7 +9,7 @@ import tempfile
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
-from urllib.parse import quote
+from urllib.parse import quote, unquote, urlsplit
 
 from atomic_io import StateFileError, atomic_write_json, load_json_state, filesystem_path
 from process_lock import (
@@ -531,6 +531,83 @@ def make_markdown_link(from_rel_path, target_rel_path, label=None):
     return f"[{escape_markdown_link_label(display_text)}]({encoded_target})"
 
 
+IMAGE_TOKEN_RE = re.compile(
+    r"!\[\[([^\]]+)\]\]|!\[([^\]\n]*)\]\(([^)\n]+)\)"
+)
+
+
+def _normalize_image_target(raw_target):
+    target = unquote(str(raw_target or "").strip())
+    target = target.split("#", 1)[0].strip()
+    target = target.split("|", 1)[0].strip()
+    if target.startswith("<") and target.endswith(">"):
+        target = target[1:-1].strip()
+    return target
+
+
+def _is_within_directory(path, directory):
+    try:
+        return os.path.commonpath([os.path.realpath(path), os.path.realpath(directory)]) == os.path.realpath(directory)
+    except ValueError:
+        return False
+
+
+def _resolve_source_image_path(raw_target, source_filepath, vault_dir):
+    target = _normalize_image_target(raw_target)
+    if not target or urlsplit(target).scheme:
+        return None
+
+    vault_root = os.path.realpath(os.path.abspath(vault_dir))
+    source_dir = os.path.dirname(os.path.abspath(source_filepath))
+    candidates = []
+    if os.path.isabs(target):
+        candidates.append(target)
+    else:
+        candidates.extend(
+            (
+                os.path.join(source_dir, target),
+                os.path.join(vault_root, target),
+                os.path.join(vault_root, "attachments", os.path.basename(target)),
+            )
+        )
+
+    for candidate in candidates:
+        resolved = os.path.realpath(os.path.abspath(candidate))
+        if _is_within_directory(resolved, vault_root) and os.path.isfile(resolved):
+            return resolved
+
+    basename = os.path.basename(target)
+    for root, _dirs, files in os.walk(vault_root):
+        for filename in files:
+            if filename.casefold() == basename.casefold():
+                resolved = os.path.realpath(os.path.join(root, filename))
+                if _is_within_directory(resolved, vault_root):
+                    return resolved
+    return None
+
+
+def rewrite_image_links_for_generated_document(content, source_filepath, generated_rel_path, vault_dir):
+    generated_filepath = os.path.join(vault_dir, generated_rel_path.replace("/", os.sep))
+    generated_dir = os.path.dirname(os.path.abspath(generated_filepath))
+
+    def replace_image(match):
+        raw_target = match.group(1) or match.group(3)
+        target = _normalize_image_target(raw_target)
+        if not target or urlsplit(target).scheme:
+            return match.group(0)
+
+        image_path = _resolve_source_image_path(raw_target, source_filepath, vault_dir)
+        if not image_path:
+            raise RuntimeError(
+                f"Local image was not found while generating {generated_rel_path}: {raw_target}"
+            )
+        relative_target = normalize_rel_path(os.path.relpath(image_path, generated_dir))
+        encoded_target = quote(relative_target, safe="/-._~")
+        return f"![]({encoded_target})"
+
+    return IMAGE_TOKEN_RE.sub(replace_image, content)
+
+
 def load_metadata(path):
     metadata = load_json_state(
         path,
@@ -983,10 +1060,17 @@ def build_subject_content(
     classification,
     path,
     generated_rel_path,
+    vault_dir,
 ):
     source_link = make_markdown_link(generated_rel_path, source_rel_path, log_name)
     heading_path = " > ".join(unit.heading_path) or unit.title
     primary_path = " > ".join(classification["primary_path"]) or "(none)"
+    content = rewrite_image_links_for_generated_document(
+        classification["content"],
+        os.path.join(vault_dir, source_rel_path.replace("/", os.sep)),
+        generated_rel_path,
+        vault_dir,
+    )
     lines = [
         AUTO_GENERATED_SUBJECT + "\n",
         f"**Date/Log**: {source_link}\n",
@@ -999,7 +1083,7 @@ def build_subject_content(
         f"**Classification Basis**: {classification['basis_by_path'][path]}\n",
         f"**Needs Review**: {'true' if classification['needs_review'] else 'false'}\n\n",
         "---\n\n",
-        classification["content"].rstrip() + "\n",
+        content.rstrip() + "\n",
     ]
     return "".join(lines)
 
@@ -1661,6 +1745,7 @@ def _main_unlocked(argv=None):
                         classification,
                         path,
                         rel_path,
+                        vault_dir,
                     )
                     desired_subjects[rel_path] = content
                     generated_paths.append(rel_path)
