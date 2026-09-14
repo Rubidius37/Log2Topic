@@ -53,14 +53,13 @@ Obsidian에서 **폴더를 Vault로 열기**를 선택하고 `Workspace/` 폴더
 
 `Workspace/Classification_Rules.md`의 표에 주제 경로를 작성합니다. 표의 여섯 열과 순서는 유지하고, Level 1부터 Level 5를 일지의 `#`부터 `#####` Heading과 맞춥니다. Heading이 분류명과 같으면 매칭 키워드는 비워도 됩니다.
 
-`Workspace/Daily_Logs/`에 `.md` 파일을 만들고 분류 규칙과 같은 이름의 Heading을 작성합니다. 일지 예제와 Heading별 분류 방법은 [사용자 안내](docs/USER_GUIDE.md#분류-규칙과-일지-작성)와 [분류 규칙](Workspace/Classification_Rules.md)을 참고하세요.
+`Workspace/Daily_Logs/`에 `.md` 파일을 만들고 분류 규칙과 같은 이름의 Heading을 작성합니다. 자세한 작성 방법은 [사용자 안내](docs/USER_GUIDE.md)를 참고하세요.
 
 ### 5. 첫 결과 확인
 
 1. 트레이의 Log2Topic 아이콘을 우클릭합니다.
 2. `로컬 문서 갱신`을 선택합니다.
-3. 완료 후 `Workspace/Subject/`와 `Workspace/Topic_Reviews/`를 확인합니다.
-4. 생성 문서의 `Date/Log` 링크로 원본 일지가 열리는지 확인합니다.
+3. 생성 문서의 `Date/Log` 링크로 원본 일지가 열리는지 확인합니다.
 
 여기까지 성공하면 기본 기능을 사용할 준비가 끝난 것입니다. Obsidian 첨부파일 위치, 검토 대시보드와 자동 실행 설정은 [사용자 안내](docs/USER_GUIDE.md)에서 이어서 확인할 수 있습니다.
 
@@ -100,7 +99,7 @@ flowchart TD
     N -.-> J["Notion / Cloudinary"]
 ```
 
-생성된 `Workspace/Subject/`와 `Workspace/Topic_Reviews/`는 직접 고치지 않습니다. 원본 일지나 분류 규칙을 수정한 뒤 다시 갱신하면 Source ID를 기준으로 기존 결과가 정리됩니다.
+생성된 문서는 직접 고치지 않습니다. 원본 일지나 분류 규칙을 수정한 뒤 다시 갱신하면 Source ID를 기준으로 기존 결과가 정리됩니다.
 
 ## 선택 사항: 외부 서비스
 
