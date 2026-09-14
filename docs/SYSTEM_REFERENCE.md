@@ -55,6 +55,7 @@ Level 1 > Level 2 > Level 3 > Level 4 > Level 5
 
 - H1은 자동 분류의 대분류 경계를 정합니다.
 - H2~H5는 현재 부모 아래에 같은 이름의 분류가 있을 때 경로를 확장합니다.
+- 같은 레벨의 Heading을 연속해서 작성하면 같은 부모 아래의 형제 가지가 됩니다. 예를 들어 `### Level3` 다음의 `### Level3-1`은 각각 `Level1 > Level2 > Level3`과 `Level1 > Level2 > Level3-1`로 분류됩니다.
 - H1을 인식하지 못한 새 구간은 키워드만으로 대분류를 추측하지 않고 `Unclassified/Missing Level 1`에 둡니다.
 - 분류 단계보다 깊은 Heading은 문서 구조로 유지되지만 분류 경로에는 추가되지 않습니다.
 
