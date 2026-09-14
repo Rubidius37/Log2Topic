@@ -1,10 +1,113 @@
 # Log2Topic
 
-**A local-first Markdown research log organizer**
+**날짜별로 쓰고, 주제별로 다시 읽는 Markdown 기록 도구**
 
-매일의 기록을 사용자가 정한 Heading과 분류 규칙에 따라 주제별 Markdown으로 재구성하는 로컬 우선 시스템입니다. 원본은 `Workspace/Daily_Logs/`에 유지하고, 다시 찾아보기 쉬운 개인 지식 위키를 자동으로 만듭니다.
+하루의 일지에는 여러 주제의 작업이 섞이고, 하나의 주제는 여러 날짜에 걸쳐 이어집니다. 나중에 특정 주제의 기록을 확인하려면 여러 파일을 열고 필요한 내용을 다시 모아야 합니다.
 
-[빠른 시작](#처음-시작하기) · [사용자 안내](docs/USER_GUIDE.md) · [분류 규칙](Workspace/Classification_Rules.md) · [Notion 연동](docs/NOTION_INTEGRATION.md)
+Log2Topic은 **일지를 한 번 작성하면 주제별 문서와 날짜별 흐름을 보여주는 리뷰를 생성**합니다. 사용자가 정한 Heading과 분류 규칙으로 동작하며, AI나 외부 서비스 없이 로컬에서 사용할 수 있습니다.
+
+[Before / After](#before--after) · [빠른 시작](#처음-시작하기) · [사용자 안내](docs/USER_GUIDE.md) · [분류 규칙](Workspace/Classification_Rules.md)
+
+## Before / After
+
+![날짜별 일지가 주제별 문서와 리뷰로 정리되는 Before/After 예시](assets/readme-before-after.svg)
+
+*입력·출력 구조를 보여주는 설명용 이미지입니다. 실제 앱 화면이 아니며, 본문은 공간에 맞게 축약했습니다. 아래에서 전체 작성 예시를 확인할 수 있습니다.*
+
+다음은 기본 제공 분류 규칙으로 사용할 수 있는 가상 예시입니다. **사용자는 날짜별 일지만 작성하고, 아래의 주제 문서와 리뷰는 Log2Topic이 만듭니다.**
+
+### Before: 날짜별 일지에 여러 작업을 기록합니다
+
+`Workspace/Daily_Logs/260901 일지.md`
+
+```markdown
+# Projects
+## Sample Project
+### Testing
+#### Functional Test
+저장 버튼을 누르면 입력한 내용이 파일에 기록되는 것을 확인했다.
+
+#### Regression Test
+기존 파일을 다시 열었을 때 줄바꿈이 유지되는 것을 확인했다.
+```
+
+`Workspace/Daily_Logs/260902 일지.md`
+
+```markdown
+# Projects
+## Sample Project
+### Testing
+#### Functional Test
+한글 파일명으로 저장하고 다시 여는 동작을 확인했다.
+```
+
+이 상태에서 기능 테스트의 흐름을 보려면 두 날짜의 일지를 열고 `Functional Test` 구간을 각각 찾아야 합니다. 회귀 테스트 기록도 첫날 일지에 함께 들어 있습니다.
+
+### 분류: Heading을 주제 경로로 연결합니다
+
+예시의 Heading은 기본 [분류 규칙](Workspace/Classification_Rules.md)에 다음과 같이 연결됩니다.
+
+| 일지의 Heading | 분류 단계 | 만들어지는 주제 경로 |
+| :--- | :--- | :--- |
+| `# Projects` | Level 1 | Projects |
+| `## Sample Project` | Level 2 | Projects → Sample Project |
+| `### Testing` | Level 3 | Projects → Sample Project → Testing |
+| `#### Functional Test` | Level 4 | Projects → Sample Project → Testing → Functional Test |
+
+일지를 저장한 뒤 트레이 메뉴의 **`로컬 문서 갱신`**을 실행합니다. 자신의 프로젝트에 사용할 때는 분류표의 이름과 일지 Heading을 맞추면 됩니다. 별도의 요약문이나 체크박스는 필요하지 않습니다.
+
+### After: 같은 주제의 기록과 리뷰가 모입니다
+
+아래는 생성 결과 중 테스트 관련 파일만 표시한 구조입니다. 원본 일지는 `Daily_Logs/`에 남습니다.
+
+```text
+Workspace/
+├─ Daily_Logs/                           ← 사용자가 작성하는 원본
+│  ├─ 260901 일지.md
+│  └─ 260902 일지.md
+├─ Subject/Projects/Sample Project/Testing/
+│  ├─ Functional Test/
+│  │  ├─ 260901 - Functional Test.md      ← 첫날의 기능 테스트 본문
+│  │  └─ 260902 - Functional Test.md      ← 다음 날의 기능 테스트 본문
+│  └─ Regression Test/
+│     └─ 260901 - Regression Test.md      ← 회귀 테스트 본문
+└─ Topic_Reviews/Projects/Sample Project/Testing/
+   ├─ [종합 리뷰] Testing.md              ← 하위 주제들을 함께 탐색
+   ├─ Functional Test/
+   │  └─ [리뷰] Functional Test.md         ← 여러 날짜의 기능 테스트 흐름
+   └─ Regression Test/
+      └─ [리뷰] Regression Test.md
+```
+
+**주제 문서에서는 해당 구간의 본문을 읽습니다.** 예를 들어 `260902 - Functional Test.md`에는 다음 내용과 원본으로 돌아가는 링크, 분류·Source ID 정보가 포함됩니다. 아래는 본문만 발췌한 모습입니다.
+
+> #### Functional Test
+> 한글 파일명으로 저장하고 다시 여는 동작을 확인했다.
+
+**리뷰에서는 여러 날짜에 흩어진 기록의 흐름을 한곳에서 확인합니다.** `[리뷰] Functional Test.md`의 ‘진행 흐름’은 다음과 같이 표시됩니다. 링크는 실제 파일에서 각 주제 문서와 원본 일지로 연결되며, 여기서는 표시 형태만 간략히 나타냈습니다.
+
+```text
+진행 흐름
+
+2026-09-01
+  Functional Test / 원본: 260901 일지
+  · 저장 버튼을 누르면 입력한 내용이 파일에 기록되는 것을 확인했다.
+
+2026-09-02
+  Functional Test / 원본: 260902 일지
+  · 한글 파일명으로 저장하고 다시 여는 동작을 확인했다.
+```
+
+현재 리뷰는 원문 앞부분의 짧은 발췌, 날짜별 기록, 하위 리뷰와 출처 링크를 모읍니다. 긴 기록의 결론이나 문제 해결 여부를 자동으로 판단하는 기능은 아닙니다.
+
+| 하고 싶은 일 | 열어볼 위치 |
+| :--- | :--- |
+| 오늘 작업을 기록하거나 내용을 수정하기 | `Daily_Logs/`의 원본 일지 |
+| 특정 주제의 본문만 읽기 | `Subject/`의 주제 문서 |
+| 같은 주제의 여러 날짜 기록을 훑어보기 | `Topic_Reviews/`의 리뷰 |
+| 여러 하위 주제를 함께 살펴보기 | 상위 폴더의 종합 리뷰 |
+
+원본이나 분류 규칙을 수정한 뒤 다시 갱신하면 생성 결과에도 반영됩니다. `Subject/`와 `Topic_Reviews/`를 따로 편집하거나 일지 내용을 수동으로 복사해 관리할 필요가 없습니다.
 
 ## 처음 시작하기
 
