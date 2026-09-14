@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900" viewBox="0 0 1200 900" role="img" aria-labelledby="title desc">
+  <title id="title">Log2Topic 일지 작성과 분류 Before / After</title>
+  <desc id="desc">두 날짜의 일지에 섞여 있는 기능 테스트와 회귀 테스트 기록이 로컬 문서 갱신 후 주제별 문서와 날짜별 리뷰로 연결되는 예시입니다.</desc>
+  <defs>
+    <style>
+      text { font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; fill: #172b4d; }
+      .title { font-size: 32px; font-weight: 700; }
+      .heading { font-size: 23px; font-weight: 700; }
+      .body { font-size: 18px; }
+      .small { font-size: 16px; fill: #52637b; }
+      .label { font-size: 15px; font-weight: 700; letter-spacing: 1px; }
+      .blue { fill: #235dc0; }
+      .green { fill: #13745b; }
+      .white { fill: white; }
+    </style>
+  </defs>
+  <rect width="1200" height="900" rx="24" fill="#f3f6fb"/>
+  <text x="44" y="57" class="title">날짜별로 쓰고, 주제별로 다시 읽습니다</text>
+  <text x="44" y="91" class="body">Log2Topic · 기본 분류 규칙을 사용한 입력·출력 예시</text>
+
+  <rect x="36" y="121" width="535" height="578" rx="18" fill="white" stroke="#dbe2ed"/>
+  <text x="60" y="157" class="label blue">BEFORE · 사용자가 작성</text>
+  <text x="60" y="193" class="heading">날짜별 일지에 작업을 기록</text>
+  <text x="60" y="224" class="small">Daily_Logs/ · 분류 규칙과 Heading 이름을 맞춥니다</text>
+
+  <rect x="59" y="244" width="489" height="240" rx="12" fill="#f6f8fc" stroke="#dbe2ed"/>
+  <text x="79" y="276" class="heading">260901 일지.md</text>
+  <text x="79" y="310" class="small"># Projects → ## Sample Project → ### Testing</text>
+  <rect x="78" y="330" width="450" height="65" rx="8" fill="#eaf1ff"/>
+  <text x="91" y="355" class="body blue">#### Functional Test</text>
+  <text x="91" y="380" class="small">저장 버튼 → 입력한 내용이 파일에 기록됨</text>
+  <rect x="78" y="405" width="450" height="65" rx="8" fill="#e7f5ef"/>
+  <text x="91" y="430" class="body green">#### Regression Test</text>
+  <text x="91" y="455" class="small">기존 파일 다시 열기 → 줄바꿈 유지 확인</text>
+
+  <rect x="59" y="501" width="489" height="170" rx="12" fill="#f6f8fc" stroke="#dbe2ed"/>
+  <text x="79" y="533" class="heading">260902 일지.md</text>
+  <text x="79" y="567" class="small"># Projects → ## Sample Project → ### Testing</text>
+  <rect x="78" y="586" width="450" height="65" rx="8" fill="#eaf1ff"/>
+  <text x="91" y="611" class="body blue">#### Functional Test</text>
+  <text x="91" y="636" class="small">한글 파일명으로 저장 → 다시 열기 확인</text>
+
+  <path d="M578 400 H611 M601 390 L611 400 L601 410" fill="none" stroke="#235dc0" stroke-width="4"/>
+
+  <rect x="624" y="121" width="540" height="578" rx="18" fill="white" stroke="#dbe2ed"/>
+  <text x="648" y="157" class="label green">AFTER · Log2Topic이 생성</text>
+  <text x="648" y="193" class="heading">주제 문서 + 여러 날짜의 리뷰</text>
+  <text x="648" y="224" class="small">Projects / Sample Project / Testing 아래에 생성</text>
+
+  <rect x="647" y="244" width="494" height="164" rx="12" fill="#f6f8fc" stroke="#dbe2ed"/>
+  <text x="667" y="276" class="heading">Subject · 주제별 본문</text>
+  <text x="667" y="313" class="body blue">Functional Test/</text>
+  <text x="684" y="341" class="small">260901 - Functional Test.md</text>
+  <text x="684" y="367" class="small">260902 - Functional Test.md</text>
+  <text x="667" y="394" class="small green">Regression Test/ → 회귀 테스트 기록 별도 보관</text>
+
+  <rect x="647" y="425" width="494" height="246" rx="12" fill="#eaf1ff" stroke="#cadbfd"/>
+  <text x="667" y="459" class="heading">Topic_Reviews · 날짜별 흐름</text>
+  <text x="667" y="491" class="body blue">[리뷰] Functional Test.md</text>
+  <line x1="678" y1="521" x2="678" y2="609" stroke="#9ab9ee" stroke-width="3"/>
+  <circle cx="678" cy="527" r="6" fill="#235dc0"/>
+  <text x="696" y="533" class="body">09-01 · 저장 버튼 동작 확인</text>
+  <text x="696" y="559" class="small">주제 문서 링크 / 원본 일지 링크</text>
+  <circle cx="678" cy="589" r="6" fill="#235dc0"/>
+  <text x="696" y="595" class="body">09-02 · 한글 파일명 저장·열기 확인</text>
+  <text x="696" y="621" class="small">주제 문서 링크 / 원본 일지 링크</text>
+  <text x="667" y="652" class="small">원문 발췌를 날짜순으로 모아 다시 찾아봅니다</text>
+
+  <rect x="36" y="721" width="1128" height="88" rx="14" fill="#172b4d"/>
+  <text x="60" y="757" class="heading white">일지 저장 → 트레이에서 ‘로컬 문서 갱신’ → 주제 문서와 리뷰 확인</text>
+  <text x="60" y="788" class="body white">원본은 Daily_Logs에 유지 · AI 없이 규칙으로 분류 · 별도 요약문 작성 불필요</text>
+  <text x="44" y="845" class="small">설명용 도식이며 실제 앱 화면이 아닙니다. 본문은 공간에 맞게 축약했습니다.</text>
+  <text x="44" y="872" class="small">현재 리뷰는 원문 발췌와 출처를 모으며, 결론이나 해결 여부를 자동으로 판단하지 않습니다.</text>
+</svg>
