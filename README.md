@@ -53,17 +53,7 @@ Obsidian에서 **폴더를 Vault로 열기**를 선택하고 `Workspace/` 폴더
 
 `Workspace/Classification_Rules.md`의 표에 주제 경로를 작성합니다. 표의 여섯 열과 순서는 유지하고, Level 1부터 Level 5를 일지의 `#`부터 `#####` Heading과 맞춥니다. Heading이 분류명과 같으면 매칭 키워드는 비워도 됩니다.
 
-`Workspace/Daily_Logs/`에 `.md` 파일을 만들고 다음처럼 작성합니다.
-
-```markdown
-# Projects
-## Sample Project
-### Testing
-
-첫 번째 테스트 기록입니다.
-```
-
-처음에는 기본 제공 예제를 그대로 사용해도 됩니다. 분류표의 빈 셀 상속, 키워드와 경계 규칙은 [Classification_Rules.md](Workspace/Classification_Rules.md)에 설명되어 있습니다.
+`Workspace/Daily_Logs/`에 `.md` 파일을 만들고 분류 규칙과 같은 이름의 Heading을 작성합니다. 일지 예제와 Heading별 분류 방법은 [사용자 안내](docs/USER_GUIDE.md#분류-규칙과-일지-작성)와 [분류 규칙](Workspace/Classification_Rules.md)을 참고하세요.
 
 ### 5. 첫 결과 확인
 
@@ -111,28 +101,6 @@ flowchart TD
 ```
 
 생성된 `Workspace/Subject/`와 `Workspace/Topic_Reviews/`는 직접 고치지 않습니다. 원본 일지나 분류 규칙을 수정한 뒤 다시 갱신하면 Source ID를 기준으로 기존 결과가 정리됩니다.
-
-## 평소 사용 방법
-
-1. `Workspace/Daily_Logs/`에 Heading과 내용을 작성합니다.
-2. 트레이에서 `로컬 문서 갱신`을 실행합니다.
-3. 미분류 항목이 있으면 `분류 검토 대시보드 열기`에서 경로를 선택합니다.
-
-### AI 서비스의 Markdown 답변을 넣을 때
-
-AI 답변의 `# 분석 결과` 같은 Heading은 분류 경계로 오인될 수 있습니다. 실제 분류 Heading 아래에서 답변 전체를 인용문 또는 Obsidian 콜아웃으로 넣고, 빈 줄을 포함한 모든 줄 앞에 `>`를 붙이세요.
-
-```markdown
-### Testing
-
-> [!quote] AI 서비스 답변
-> # 분석 결과
->
-> ## 가능한 원인
-> 원인에 대한 설명입니다.
-```
-
-콜아웃 안의 Heading은 분류에 사용되지 않습니다. 단순히 코드 블록으로 감싸는 것만으로는 충분하지 않습니다. 전체 예제와 Heading을 쓰지 않는 프롬프트는 [사용자 안내](docs/USER_GUIDE.md#ai-서비스의-markdown-답변-붙여넣기)를 참고하세요.
 
 ## 선택 사항: 외부 서비스
 

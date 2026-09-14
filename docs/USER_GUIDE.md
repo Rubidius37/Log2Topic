@@ -60,7 +60,7 @@ Obsidian에서는 **새 Vault 만들기**가 아니라 **폴더를 Vault로 열�
 
 최초 실행은 전용 Python 환경을 준비하느라 조금 더 걸릴 수 있습니다. 현재 실행 파일은 디지털 서명되지 않았습니다. Windows가 **PC 보호** 창을 표시하면 공식 배포 위치에서 받은 파일인지와 파일 이름이 `Log2Topic.exe`인지 확인한 뒤 실행 여부를 결정하세요.
 
-## 분류 규칙 작성
+## 분류 규칙과 일지 작성
 
 분류 규칙은 `Workspace/`의 `Classification_Rules.md` 표에 작성합니다. 표의 여섯 열과 열 순서는 바꾸지 않습니다.
 
@@ -73,10 +73,6 @@ Obsidian에서는 **새 Vault 만들기**가 아니라 **폴더를 Vault로 열�
 | Level 5 | `#####` |
 
 Heading이 분류명과 정확히 일치하면 매칭 키워드는 없어도 됩니다. 같은 부모 아래에 경로를 추가할 때 상위 셀을 비우면 바로 위 행의 값을 이어받습니다. 키워드 문법과 Level 간 경계는 [Classification_Rules.md](../Workspace/Classification_Rules.md)의 표 아래 설명을 참고하세요.
-
-## 평소 사용 방법
-
-### 일지 작성
 
 `Daily_Logs/`에 Markdown 파일을 만들고 분류 규칙과 같은 이름을 Heading으로 작성합니다.
 
@@ -91,6 +87,27 @@ Heading이 분류명과 정확히 일치하면 매칭 키워드는 없어도 됩
 파일명은 자유롭게 정할 수 있습니다. Windows 메모장을 사용했다면 파일 이름이 `.md.txt`로 저장되지 않았는지 확인하세요.
 
 여러 주제에 동시에 연결해야 하는 내용은 분류 검토 대시보드에서 복수 경로를 선택할 수 있습니다. 직접 작성할 때는 원본 구간에 `Category:`로 전체 경로를 명시할 수도 있습니다.
+
+## 평소 사용 방법
+
+1. `Daily_Logs/`에 Heading과 내용을 작성합니다.
+2. 트레이에서 `로컬 문서 갱신`을 실행합니다.
+3. `Subject/`와 `Topic_Reviews/`에서 생성 결과를 확인합니다.
+4. 미분류 항목이 있으면 `분류 검토 대시보드 열기`에서 경로를 선택합니다.
+
+### 생성 파일 구조와 리뷰 범위
+
+로컬 갱신은 원본 일지를 직접 덮어쓰지 않고 다음 결과물을 다시 생성합니다.
+
+| 경로 | 내용 |
+| :--- | :--- |
+| `Subject/` | 분류 경로별 원본 기록과 `Date/Log` 링크 |
+| `Topic_Reviews/` | 분류별 진행 흐름, 이슈 후보와 관련 원본 링크 |
+| `scripts/organizer_metadata.json` | Source ID, 현재 분류 경로와 검토 상태 |
+
+`Subject/`, `Topic_Reviews/`와 metadata는 자동 생성물이므로 직접 수정하지 않습니다. 변경할 내용은 `Daily_Logs/` 또는 `Classification_Rules.md`에 반영한 뒤 로컬 갱신을 다시 실행합니다.
+
+`Topic_Reviews/`의 Level 1 종합 리뷰는 최근 20건, Level 2 종합 리뷰는 최근 50건의 상세 흐름을 표시합니다. Level 3~5 리뷰는 해당 경로의 전체 기록을 표시합니다. 같은 원본 구간이 여러 하위 주제에 연결되면 종합 리뷰에서는 Source ID 기준으로 한 번만 집계합니다.
 
 ### AI 서비스의 Markdown 답변 붙여넣기
 
@@ -161,18 +178,6 @@ Markdown으로 답하되 H1~H6 Heading(#, ##, ### 등)은 사용하지 말고,
 로컬 기능만 사용할 때는 Notion이나 Cloudinary를 설정할 필요가 없습니다. 연결하려면 [Notion 연동 안내](NOTION_INTEGRATION.md)를 처음부터 순서대로 진행하세요.
 
 하나의 Notion 데이터베이스에는 하나의 기준 Markdown 작업공간만 연결하는 것을 권장합니다. 서로 다른 문서 집합을 가진 여러 PC가 같은 데이터베이스에 전체 동기화를 실행하면 다른 작업공간의 페이지를 로컬에 없는 문서로 판단할 수 있습니다.
-
-## 자주 사용하는 파일
-
-| 파일 | 용도 |
-| :--- | :--- |
-| `Log2Topic.exe` | 트레이 앱 실행과 일반 기능 접근 |
-| `Classification_Rules.md` | 주제 트리와 보조 키워드 관리 |
-| `Daily_Logs/` | 사용자가 작성하는 원본 일지 |
-| `Subject/` | 자동 생성되는 주제별 이력 |
-| `Topic_Reviews/` | 자동 생성되는 주제별 리뷰 |
-
-평소에는 `Log2Topic.exe`, `Classification_Rules.md`와 `Daily_Logs/`만 알아도 충분합니다.
 
 ## 문제 해결
 
