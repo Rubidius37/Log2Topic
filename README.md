@@ -105,6 +105,11 @@ Workspace/
 </details>
 
 ## 처음 시작하기
+다음 링크에서 다운로드가 가능합니다.
+https://github.com/Rubidius37/Log2Topic/releases
+
+아래 사진과 같이 최신 버전의 릴리즈를 다운로드 해주세요.
+<img width="1241" height="755" alt="image" src="https://github.com/user-attachments/assets/c96365d3-c49f-4e43-a355-3bf58d68e810" />
 
 현재 배포본은 **Windows 10/11 x64**용입니다. Python, Git, Notion 계정은 필요하지 않습니다. [Obsidian](https://obsidian.md/download)을 권장하지만 폴더 단위로 파일을 여는 다른 Markdown 편집기도 사용할 수 있습니다.
 
