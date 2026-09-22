@@ -62,6 +62,32 @@ def normalize_name(value):
     return re.sub(r"\s+", " ", value).strip().casefold()
 
 
+def is_markdown_blockquote_line(line):
+    return line.lstrip(" \t").startswith(">")
+
+
+def iter_active_source_id_matches(content):
+    """Yield Source ID markers that belong to the source document itself.
+
+    Source ID comments inside Markdown blockquotes are quoted material, not
+    identifiers for the surrounding classification unit.
+    """
+    for line in content.splitlines():
+        if is_markdown_blockquote_line(line):
+            continue
+        yield from SOURCE_ID_RE.finditer(line)
+
+
+def replace_active_source_id_comments(content, replacement):
+    lines = []
+    for line in content.splitlines(keepends=True):
+        if is_markdown_blockquote_line(line):
+            lines.append(line)
+        else:
+            lines.append(SOURCE_ID_RE.sub(replacement, line))
+    return "".join(lines)
+
+
 def normalize_rel_path(path):
     return path.replace("\\", "/")
 
@@ -689,7 +715,7 @@ def resolve_source_id(
     used_ids,
     allow_legacy_heading=True,
 ):
-    marker = SOURCE_ID_RE.search(content)
+    marker = next(iter_active_source_id_matches(content), None)
     if marker:
         source_id = marker.group(1).lower()
     else:
@@ -739,7 +765,7 @@ def normalize_source_id_comments(content):
             changed += 1
         return replacement
 
-    return SOURCE_ID_RE.sub(replace, content), changed
+    return replace_active_source_id_comments(content, replace), changed
 
 
 def render_source_id_markers(original_content, markers):
@@ -749,7 +775,7 @@ def render_source_id_markers(original_content, markers):
     lines = normalized_content.splitlines()
     existing_ids = {
         match.group(1).lower()
-        for match in SOURCE_ID_RE.finditer(original_content)
+        for match in iter_active_source_id_matches(original_content)
     }
     frontmatter_end = find_frontmatter_end(lines)
     pending = []
@@ -852,7 +878,9 @@ def build_source_marker_plans(
                 classification = classify_unit(unit, tree)
                 if is_meaningless_content(classification["content"]):
                     continue
-                found_markers = SOURCE_ID_RE.findall(unit.content)
+                found_markers = [
+                    match.group(1) for match in iter_active_source_id_matches(unit.content)
+                ]
                 if len(found_markers) > 1:
                     raise RuntimeError(
                         f"Multiple Source ID markers belong to one source unit: "
@@ -1007,7 +1035,7 @@ def rebuild_source_id_markers(daily_logs_dir, vault_dir, backup_root):
                 filepath = os.path.join(root, filename)
                 with open(filepath, "r", encoding="utf-8", newline="") as file_obj:
                     original_content = file_obj.read()
-                rebuilt_content = SOURCE_ID_RE.sub("", original_content)
+                rebuilt_content = replace_active_source_id_comments(original_content, "")
                 if rebuilt_content == original_content:
                     continue
                 relative_path = os.path.relpath(filepath, vault_dir)
