@@ -396,6 +396,48 @@ class HierarchicalClassifierTests(unittest.TestCase):
             updated,
         )
 
+    def test_quoted_source_id_comment_is_ignored_and_preserved(self):
+        quoted_id = "aaaabbbbccccdddd"
+        original = (
+            "# Knowledge\n"
+            f"> <!-- research-notes-source-id: {quoted_id} -->\n"
+            "body\n"
+        )
+
+        updated, inserted, headings, roots, normalized = render_source_id_markers(
+            original,
+            [(1, "1111222233334444")],
+        )
+
+        self.assertEqual((inserted, headings, roots, normalized), (1, 1, 0, 0))
+        self.assertIn(f"> <!-- research-notes-source-id: {quoted_id} -->", updated)
+        self.assertIn("<!-- research-notes-source-id: 1111222233334444 -->", updated)
+
+    def test_quoted_source_id_comment_does_not_define_unit_id(self):
+        unit = SourceUnit(
+            title="Quoted marker",
+            lines=[
+                "## Quoted marker",
+                "> <!-- research-notes-source-id: aaaabbbbccccdddd -->",
+                "body",
+            ],
+            category_path=("Knowledge",),
+            heading_path=("Knowledge", "Quoted marker"),
+            start_line=2,
+        )
+
+        source_id = resolve_source_id(
+            "Daily/test.md",
+            unit,
+            unit.content,
+            ({}, {}),
+            ({}, {}),
+            set(),
+            allow_legacy_heading=False,
+        )
+
+        self.assertNotEqual(source_id, "aaaabbbbccccdddd")
+
     def test_persisted_marker_survives_heading_rename(self):
         daily_dir = os.path.join(self.temp_dir.name, "Daily_Logs")
         os.makedirs(daily_dir)
