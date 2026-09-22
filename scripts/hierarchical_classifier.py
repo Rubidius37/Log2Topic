@@ -279,6 +279,7 @@ class SourceMarkerPlan:
     heading_count: int
     document_root_count: int
     normalized_marker_count: int = 0
+    relocations: list = field(default_factory=list)
 
 
 def parse_markdown_into_units(filepath, tree):
@@ -755,6 +756,46 @@ def source_id_comment(source_id):
     return f"<!-- {SOURCE_ID_MARKER_NAME}: {source_id.lower()} -->"
 
 
+def unit_source_id_markers(unit):
+    markers = []
+    for offset, line in enumerate(unit.lines):
+        if is_markdown_blockquote_line(line):
+            continue
+        for match in SOURCE_ID_RE.finditer(line):
+            markers.append((unit.start_line + offset, match.group(1).lower()))
+    return markers
+
+
+def find_source_id_relocations(units, tree):
+    """Move an empty parent's ID into its newly recognized child unit.
+
+    A heading correction can turn an H3-H5 heading from ordinary body structure
+    into a classified child. If the preceding parent then contains only its
+    heading and one Source ID marker, that ID belongs to the child content that
+    was previously part of the parent unit.
+    """
+    relocations = []
+    for parent, child in zip(units, units[1:]):
+        parent_markers = unit_source_id_markers(parent)
+        if len(parent_markers) != 1 or unit_source_id_markers(child):
+            continue
+        parent_classification = classify_unit(parent, tree)
+        child_classification = classify_unit(child, tree)
+        if not is_meaningless_content(parent_classification["content"]):
+            continue
+        if is_meaningless_content(child_classification["content"]):
+            continue
+        if (
+            not parent.category_path
+            or not is_prefix(parent.category_path, child.category_path)
+            or len(child.category_path) <= len(parent.category_path)
+        ):
+            continue
+        source_line, source_id = parent_markers[0]
+        relocations.append((source_line, child.start_line, source_id))
+    return relocations
+
+
 def normalize_source_id_comments(content):
     changed = 0
 
@@ -768,15 +809,28 @@ def normalize_source_id_comments(content):
     return replace_active_source_id_comments(content, replace), changed
 
 
-def render_source_id_markers(original_content, markers):
+def render_source_id_markers(original_content, markers, relocations=()):
     newline = "\r\n" if "\r\n" in original_content else "\n"
     had_final_newline = original_content.endswith(("\n", "\r"))
     normalized_content, normalized_count = normalize_source_id_comments(original_content)
     lines = normalized_content.splitlines()
+    removed_line_numbers = set()
+    relocated_ids = {
+        source_id.lower() for _source_line, _target_line, source_id in relocations
+    }
+    for source_line, _target_line, _source_id in sorted(relocations, reverse=True):
+        source_index = source_line - 1
+        if source_index < 0 or source_index >= len(lines):
+            raise RuntimeError(f"Invalid Source ID relocation line {source_line}.")
+        lines[source_index] = SOURCE_ID_RE.sub("", lines[source_index])
+        if not lines[source_index].strip():
+            del lines[source_index]
+            removed_line_numbers.add(source_line)
     existing_ids = {
         match.group(1).lower()
         for match in iter_active_source_id_matches(original_content)
     }
+    existing_ids.difference_update(relocated_ids)
     frontmatter_end = find_frontmatter_end(lines)
     pending = []
 
@@ -784,7 +838,9 @@ def render_source_id_markers(original_content, markers):
         source_id = source_id.lower()
         if source_id in existing_ids:
             continue
-        start_index = line_number - 1
+        start_index = line_number - 1 - sum(
+            removed_line < line_number for removed_line in removed_line_numbers
+        )
         if start_index < 0 or start_index > len(lines):
             raise RuntimeError(
                 f"Invalid Source ID insertion line {line_number}."
@@ -869,6 +925,11 @@ def build_source_marker_plans(
                         f"Source file changed while it was being scanned: {source_rel_path}"
                     )
 
+            relocations = find_source_id_relocations(units, tree)
+            relocated_targets = {
+                target_line: source_id
+                for _source_line, target_line, source_id in relocations
+            }
             markers = []
             heading_count = 0
             document_root_count = 0
@@ -886,6 +947,16 @@ def build_source_marker_plans(
                         f"Multiple Source ID markers belong to one source unit: "
                         f"{source_rel_path}:{unit.start_line}"
                     )
+                relocated_id = relocated_targets.get(unit.start_line)
+                if relocated_id:
+                    markers.append((unit.start_line, relocated_id))
+                    existing_count += 1
+                    first_line = unit.content.splitlines()[0] if unit.content else ""
+                    if HEADING_RE.match(first_line):
+                        heading_count += 1
+                    else:
+                        document_root_count += 1
+                    continue
                 source_id = resolve_source_id(
                     source_rel_path,
                     unit,
@@ -918,6 +989,7 @@ def build_source_marker_plans(
                         heading_count=heading_count,
                         document_root_count=document_root_count,
                         normalized_marker_count=normalized_marker_count,
+                        relocations=relocations,
                     )
                 )
     return plans, existing_count
@@ -947,7 +1019,9 @@ def persist_source_marker_plans(plans, backup_root, vault_dir, dry_run=False):
                 rendered_headings,
                 rendered_roots,
                 rendered_normalized,
-            ) = render_source_id_markers(plan.original_content, plan.markers)
+            ) = render_source_id_markers(
+                plan.original_content, plan.markers, plan.relocations
+            )
             if (
                 inserted != len(plan.markers)
                 or rendered_headings != plan.heading_count

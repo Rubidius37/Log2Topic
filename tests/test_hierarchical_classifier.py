@@ -438,6 +438,44 @@ class HierarchicalClassifierTests(unittest.TestCase):
 
         self.assertNotEqual(source_id, "aaaabbbbccccdddd")
 
+    def test_heading_correction_moves_empty_parent_source_id_to_child(self):
+        daily_dir = os.path.join(self.temp_dir.name, "Daily_Logs")
+        os.makedirs(daily_dir)
+        source_path = os.path.join(daily_dir, "260922.md")
+        source_id = "aaaabbbbccccdddd"
+        with open(source_path, "w", encoding="utf-8") as file_obj:
+            file_obj.write(
+                "# Knowledge\n"
+                "## Analysis\n"
+                f"<!-- research-notes-source-id: {source_id} -->\n"
+                "### Qualitative\n"
+                "body\n"
+            )
+
+        indexes = build_id_indexes({"entries": {}})
+        plans, existing = build_source_marker_plans(
+            daily_dir,
+            self.temp_dir.name,
+            self.tree,
+            indexes,
+            indexes,
+            allow_legacy_heading=False,
+        )
+
+        self.assertEqual(existing, 1)
+        self.assertEqual(plans[0].relocations, [(3, 4, source_id)])
+        persist_source_marker_plans(
+            plans, os.path.join(self.temp_dir.name, "backups"), self.temp_dir.name
+        )
+        with open(source_path, "r", encoding="utf-8") as file_obj:
+            updated = file_obj.read()
+        self.assertNotIn(
+            f"## Analysis\n<!-- research-notes-source-id: {source_id}", updated
+        )
+        self.assertIn(
+            f"### Qualitative\n<!-- research-notes-source-id: {source_id}", updated
+        )
+
     def test_persisted_marker_survives_heading_rename(self):
         daily_dir = os.path.join(self.temp_dir.name, "Daily_Logs")
         os.makedirs(daily_dir)
