@@ -154,6 +154,12 @@ class HierarchicalClassifierTests(unittest.TestCase):
             encoding="utf-8",
         ) as file_obj:
             file_obj.write("ignored\n")
+        with open(
+            os.path.join(daily_dir, "26.09.27 일지"),
+            "w",
+            encoding="utf-8",
+        ) as file_obj:
+            file_obj.write("# Knowledge\n")
 
         self.assertEqual(count_daily_markdown_files(daily_dir), 1)
 
@@ -167,6 +173,8 @@ class HierarchicalClassifierTests(unittest.TestCase):
         os.makedirs(daily_dir)
         os.makedirs(subject_dir)
         os.makedirs(review_dir)
+        with open(os.path.join(daily_dir, "26.09.27 일지"), "w", encoding="utf-8") as file_obj:
+            file_obj.write("# Knowledge\n## Analysis\nclassification must skip this file\n")
 
         with open(
             os.path.join(vault_dir, "Classification_Rules.md"),

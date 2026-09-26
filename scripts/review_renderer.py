@@ -133,7 +133,7 @@ def _relative_url(from_path, target_path):
 
 
 def _record_date(record):
-    date = source_date_key(record["source_log"])
+    date = source_date_key(record["source_path"])
     return "날짜 없음" if date == "0000-00-00" else date
 
 

@@ -31,7 +31,7 @@ def _unique_records(records):
         if path not in current["matched_categories"]:
             current["matched_categories"].append(path)
     return sorted(merged.values(), key=lambda record: (
-        source_date_key(record["source_log"]),
+        source_date_key(record["source_path"]),
         record["source_path"], record["source_line"], record.get("source_id") or "",
     ))
 

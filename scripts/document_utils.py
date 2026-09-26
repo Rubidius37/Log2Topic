@@ -2,6 +2,7 @@
 
 import os
 import re
+from datetime import date
 from urllib.parse import quote, unquote, urlsplit
 
 
@@ -98,13 +99,22 @@ def _resolve_source_image_path(raw_target, source_filepath, vault_dir):
 
 
 def source_date_key(value):
-    stem = os.path.splitext(os.path.basename(value))[0]
-    dotted = re.match(r"^(\d{2})\.(\d{2})\.(\d{2})", stem)
-    if dotted:
-        return f"20{dotted.group(1)}-{dotted.group(2)}-{dotted.group(3)}"
-    compact = re.match(r"^(\d{2})(\d{2})(\d{2})", stem)
-    if compact:
-        return f"20{compact.group(1)}-{compact.group(2)}-{compact.group(3)}"
+    filename = os.path.basename(str(value or ""))
+    if not filename.casefold().endswith(".md"):
+        return "0000-00-00"
+    stem = filename[:-3]
+    for pattern, short_year in (
+        (r"^(\d{4})-(\d{2})-(\d{2})(?!\d)", False),
+        (r"^(\d{2})\.(\d{2})\.(\d{2})(?!\d)", True),
+        (r"^(\d{2})(\d{2})(\d{2})(?!\d)", True),
+    ):
+        match = re.match(pattern, stem)
+        if match:
+            year = int(match.group(1)) + (2000 if short_year else 0)
+            try:
+                return date(year, int(match.group(2)), int(match.group(3))).isoformat()
+            except ValueError:
+                return "0000-00-00"
     return "0000-00-00"
 
 

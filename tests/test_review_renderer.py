@@ -1,6 +1,7 @@
 import sys
 import tempfile
 import unittest
+import os
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
@@ -26,6 +27,39 @@ def rendered(root, records):
 
 
 class ReviewRendererTests(unittest.TestCase):
+    def test_undated_file_modification_does_not_change_recent_five(self):
+        records = [record(day, ["A", "B"], f"dated-body-{day:02d}") for day in range(1, 7)]
+        undated = record(20, ["A", "B"], "undated-body")
+        undated["source_path"] = "Daily_Logs/undated.md"
+        undated["source_log"] = "undated"
+        records.append(undated)
+        with tempfile.TemporaryDirectory() as root:
+            source = Path(root) / undated["source_path"]
+            source.parent.mkdir(parents=True, exist_ok=True)
+            source.write_text("# A\n", encoding="utf-8")
+            os.utime(source, (2_000_000_000, 2_000_000_000))
+            overview = rendered(root, records)["[리뷰] B.md"]
+            self.assertNotIn("undated-body", overview)
+            self.assertNotIn("dated-body-01", overview)
+            for day in range(2, 7):
+                self.assertIn(f"dated-body-{day:02d}", overview)
+
+    def test_overview_selects_latest_five_by_dotted_date(self):
+        dates = (10, 1, 8, 3, 7, 2, 9)
+        records = []
+        for number, day in enumerate(dates):
+            item = record(number, ["A", "B"], f"dated-body-{day:02d}")
+            item["source_path"] = f"Daily_Logs/2026-09/26.09.{day:02d} 일지.md"
+            item["source_log"] = "표시용 이름"
+            records.append(item)
+        with tempfile.TemporaryDirectory() as root:
+            overview = rendered(root, records)["[리뷰] B.md"]
+            self.assertIn("2026-09-01 ~ 2026-09-10", overview)
+            for day in (10, 9, 8, 7, 3):
+                self.assertIn(f"dated-body-{day:02d}", overview)
+            for day in (1, 2):
+                self.assertNotIn(f"dated-body-{day:02d}", overview)
+
     def test_policy_by_depth_and_unclassified_root(self):
         self.assertEqual([review_policy(path).mode for path in [
             ("A",), ("A", "B"), ("A", "B", "C"),
@@ -73,6 +107,7 @@ class ReviewRendererTests(unittest.TestCase):
 
     def test_determinism_dry_run_and_missing_id(self):
         records = [record(1, ["A", "B"], source_id=False)]
+        records[0]["source_path"] = "Daily_Logs/undated.md"
         records[0]["source_log"] = "undated"
         with tempfile.TemporaryDirectory() as root:
             first = rendered(root, records)
