@@ -32,6 +32,32 @@ IMAGE_TOKEN_RE = re.compile(
 )
 
 
+NOTION_CODE_LANGUAGES = frozenset(language.strip() for language in """
+abap, abc, agda, arduino, ascii art, assembly, bash, basic, bnf, c, c#, c++, clojure,
+coffeescript, coq, css, dart, dhall, diff, docker, ebnf, elixir, elm, erlang, f#, flow,
+fortran, gherkin, glsl, go, graphql, groovy, haskell, hcl, html, idris, java, javascript,
+json, julia, kotlin, latex, less, lisp, livescript, llvm ir, lua, makefile, markdown,
+markup, matlab, mathematica, mermaid, nix, notion formula, objective-c, ocaml, pascal,
+perl, php, plain text, powershell, prolog, protobuf, purescript, python, r, racket,
+reason, ruby, rust, sass, scala, scheme, scss, shell, smalltalk, solidity, sql, swift,
+toml, typescript, vb.net, verilog, vhdl, visual basic, webassembly, xml, yaml,
+java/c/c++/c#
+""".split(","))
+
+
+def notion_code_language(label):
+    language = label.strip().lower()
+    aliases = {
+        "py": "python", "python3": "python", "js": "javascript",
+        "ts": "typescript", "sh": "bash", "cmd": "shell", "bat": "shell",
+        "ps1": "powershell", "pwsh": "powershell", "text": "plain text",
+        "txt": "plain text", "plaintext": "plain text", "text/plain": "plain text",
+        "yml": "yaml", "md": "markdown",
+    }
+    language = aliases.get(language, language)
+    return language if language in NOTION_CODE_LANGUAGES else "plain text"
+
+
 def append_rich_text(parts, content, bold=False, code=False, link_url=None):
     limit = 1900
     for i in range(0, len(content), limit):
@@ -353,18 +379,7 @@ def markdown_to_notion_blocks(
                 code_lines = []
             else:
                 in_code_block = True
-                lang = stripped_line[3:].strip()
-                code_lang = lang if lang else "plain text"
-                lang_mapping = {
-                    "py": "python",
-                    "js": "javascript",
-                    "ts": "typescript",
-                    "sh": "bash",
-                    "cmd": "shell",
-                    "bat": "shell",
-                    "ps1": "powershell"
-                }
-                code_lang = lang_mapping.get(code_lang.lower(), code_lang)
+                code_lang = notion_code_language(stripped_line[3:])
             i += 1
             continue
 
