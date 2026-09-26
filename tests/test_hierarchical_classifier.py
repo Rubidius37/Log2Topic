@@ -679,7 +679,7 @@ class HierarchicalClassifierTests(unittest.TestCase):
         with open(log_path, "r", encoding="utf-8") as file_obj:
             self.assertEqual(file_obj.read(), "# Knowledge\nbody\n")
 
-    def test_hierarchical_review_keeps_progress_and_issue_sections(self):
+    def test_hierarchical_review_uses_source_blocks_without_issue_candidates(self):
         records = [
             {
                 "source_id": "abcdef1234567890",
@@ -692,17 +692,18 @@ class HierarchicalClassifierTests(unittest.TestCase):
                     "Subject_Hierarchical/Projects/Project Beta/"
                     "Reporting/260814 - Reporting.md"
                 ),
-                "summary_lines": ["기능 테스트를 진행했다."],
-                "issue_lines": ["추가 확인이 필요하다."],
+                "review_blocks": hierarchical_classifier.extract_review_blocks(
+                    "### Reporting\n기능 테스트를 진행했다.\n", "Daily_Logs/2026-08/260814 일지.md",
+                    "abcdef1234567890", start_line=4, root_title="Reporting",
+                ),
             }
         ]
         paths = write_reviews(self.temp_dir.name, "Reviews", records)
         with open(os.path.join(self.temp_dir.name, paths[0]), "r", encoding="utf-8") as file_obj:
             review = file_obj.read()
-        self.assertIn("## 리뷰 스냅샷", review)
-        self.assertIn("## 진행 흐름", review)
-        self.assertIn("## 확인할 이슈 후보", review)
-        self.assertIn("추가 확인이 필요하다.", review)
+        self.assertIn("## 기록", review)
+        self.assertIn("기능 테스트를 진행했다.", review)
+        self.assertNotIn("확인할 이슈 후보", review)
 
     def test_generated_links_use_portable_relative_markdown_paths(self):
         link = make_markdown_link(
@@ -730,8 +731,10 @@ class HierarchicalClassifierTests(unittest.TestCase):
                     "Subject/Projects/Project Alpha/Reporting/"
                     "260814 - Reporting.md"
                 ),
-                "summary_lines": ["기능 테스트를 진행했다."],
-                "issue_lines": [],
+                "review_blocks": hierarchical_classifier.extract_review_blocks(
+                    "### Reporting\n기능 테스트를 진행했다.\n", "Daily_Logs/2026-08/260814 일지.md",
+                    "abcdef1234567890", start_line=4, root_title="Reporting",
+                ),
             }
         ]
 
@@ -744,12 +747,12 @@ class HierarchicalClassifierTests(unittest.TestCase):
             review = file_obj.read()
 
         self.assertIn(
-            "[Reporting](../../../../Subject/Projects/Project%20Alpha/"
+            "[상세 문서](../../../../Subject/Projects/Project%20Alpha/"
             "Reporting/260814%20-%20Reporting.md)",
             review,
         )
         self.assertIn(
-            "[260814 일지](../../../../Daily_Logs/2026-08/"
+            "[원본 일지](../../../../Daily_Logs/2026-08/"
             "260814%20%EC%9D%BC%EC%A7%80.md)",
             review,
         )
@@ -762,8 +765,11 @@ class HierarchicalClassifierTests(unittest.TestCase):
             "source_log": "260814 일지",
             "source_line": 4,
             "title": "Result comparison",
-            "summary_lines": ["CM과 DM을 비교했다."],
-            "issue_lines": [],
+            "review_blocks": hierarchical_classifier.extract_review_blocks(
+                "### Result comparison\nCM과 DM을 비교했다.",
+                "Daily_Logs/2026-08/260814 일지.md", "same-source-id",
+                root_title="Result comparison",
+            ),
         }
         records = [
             dict(
@@ -778,12 +784,53 @@ class HierarchicalClassifierTests(unittest.TestCase):
             ),
         ]
         paths = write_reviews(self.temp_dir.name, "Reviews", records)
-        parent_path = [path for path in paths if path.endswith("[종합 리뷰] Knowledge.md")][0]
+        parent_path = [path for path in paths if path.endswith("[종합 리뷰] Analysis.md")][0]
         with open(os.path.join(self.temp_dir.name, parent_path), "r", encoding="utf-8") as file_obj:
             parent_review = file_obj.read()
         self.assertIn("**Entries**: 1", parent_review)
-        self.assertIn("## 하위 리뷰", parent_review)
-        self.assertIn("하위 문서:", parent_review)
+        self.assertIn("## 주제 목차", parent_review)
+        self.assertEqual(parent_review.count("CM과 DM을 비교했다."), 1)
+        self.assertNotIn("앞서 표시한 기록", parent_review)
+
+    def test_isolated_classifier_review_regeneration_preserves_sources_and_manual_file(self):
+        root = self.temp_dir.name
+        script_dir = os.path.join(root, "scripts")
+        daily_dir = os.path.join(root, "Daily_Logs", "2026-08")
+        os.makedirs(script_dir)
+        os.makedirs(daily_dir)
+        source = os.path.join(daily_dir, "260814 일지.md")
+        original = "# Projects\n## Project Alpha\n### Testing\n결과를 기록했다.\n"
+        with open(source, "w", encoding="utf-8") as file_obj:
+            file_obj.write(original)
+        manual = os.path.join(root, "Topic_Reviews", "manual.md")
+        os.makedirs(os.path.dirname(manual))
+        with open(manual, "w", encoding="utf-8") as file_obj:
+            file_obj.write("manual document\n")
+        fake_module = os.path.join(script_dir, "hierarchical_classifier.py")
+        args = ["--production", "--output-dir", "Subject", "--review-dir",
+                "Topic_Reviews", "--metadata-file", "organizer_metadata.json",
+                "--no-persist-source-ids"]
+
+        def generated_snapshot():
+            results = {}
+            for folder in ("Subject", "Topic_Reviews"):
+                for base, _dirs, files in os.walk(os.path.join(root, folder)):
+                    for filename in files:
+                        path = os.path.join(base, filename)
+                        with open(path, "rb") as file_obj:
+                            results[os.path.relpath(path, root)] = file_obj.read()
+            return results
+
+        with patch.object(hierarchical_classifier, "__file__", fake_module):
+            self.assertEqual(hierarchical_classifier.main(args), 0)
+            first = generated_snapshot()
+            self.assertEqual(hierarchical_classifier.main(args), 0)
+            self.assertEqual(first, generated_snapshot())
+        with open(source, encoding="utf-8") as file_obj:
+            self.assertEqual(file_obj.read(), original)
+        with open(manual, encoding="utf-8") as file_obj:
+            self.assertEqual(file_obj.read(), "manual document\n")
+        self.assertTrue(any("[리뷰] Testing.md" in path for path in first))
 
     def test_review_output_is_identical_when_sources_do_not_change(self):
         records = [
@@ -795,8 +842,11 @@ class HierarchicalClassifierTests(unittest.TestCase):
                 "title": "Qualitative test",
                 "category_path": ["Knowledge", "Analysis", "Qualitative"],
                 "generated_path": "Subject_Hierarchical/Knowledge/Analysis/Qualitative/note.md",
-                "summary_lines": ["정성 분석 결과를 기록했다."],
-                "issue_lines": [],
+                "review_blocks": hierarchical_classifier.extract_review_blocks(
+                    "### Qualitative test\n정성 분석 결과를 기록했다.",
+                    "Daily_Logs/2026-08/260814 일지.md", "stable-source-id",
+                    root_title="Qualitative test",
+                ),
             }
         ]
 

@@ -9,7 +9,7 @@ import tempfile
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
-from urllib.parse import quote, unquote, urlsplit
+from urllib.parse import quote, urlsplit
 
 from atomic_io import StateFileError, atomic_write_json, load_json_state, filesystem_path
 from process_lock import (
@@ -20,7 +20,14 @@ from process_lock import (
     lock_is_delegated_by_parent,
     print_lock_error,
 )
+from document_utils import (
+    AUTO_GENERATED_REVIEW, AUTO_GENERATED_SUBJECT, IMAGE_TOKEN_RE,
+    _normalize_image_target, _resolve_source_image_path,
+    cleanup_generated_root, escape_markdown_link_label, is_prefix,
+    make_markdown_link, normalize_rel_path, sanitize_filename, source_date_key,
+)
 from workspace_paths import resolve_workspace_dir
+from review_content import extract_review_blocks
 
 
 CATEGORY_LEVELS = 5
@@ -31,8 +38,6 @@ DEFAULT_METADATA_FILE = "organizer_metadata_hierarchical.json"
 PRODUCTION_OUTPUT_DIR = "Subject"
 PRODUCTION_REVIEW_DIR = "Topic_Reviews"
 PRODUCTION_METADATA_FILE = "organizer_metadata.json"
-AUTO_GENERATED_SUBJECT = "<!-- AUTO-GENERATED: Log2Topic hierarchical subject. -->"
-AUTO_GENERATED_REVIEW = "<!-- AUTO-GENERATED: Log2Topic hierarchical review. -->"
 SOURCE_ID_MARKER_NAME = "research-notes-source-id"
 HEADING_RE = re.compile(r"^(#{1,5})[ \t]+(.*?)[ \t]*$")
 SOURCE_ID_RE = re.compile(
@@ -40,22 +45,6 @@ SOURCE_ID_RE = re.compile(
     r"([a-fA-F0-9]{8,64})\s*-->",
     re.IGNORECASE,
 )
-ISSUE_HINT_KEYWORDS = (
-    "문제",
-    "이슈",
-    "오류",
-    "에러",
-    "확인",
-    "검토",
-    "필요",
-    "개선",
-    "주의",
-    "todo",
-    "fixme",
-    "?",
-)
-
-
 def normalize_name(value):
     value = re.sub(r"[`*_~]", "", value or "")
     value = re.sub(r"[_-]+", " ", value)
@@ -88,13 +77,8 @@ def replace_active_source_id_comments(content, replacement):
     return "".join(lines)
 
 
-def normalize_rel_path(path):
-    return path.replace("\\", "/")
 
 
-def sanitize_filename(name):
-    name = re.sub(r'[\\/*?:"<>|]', "_", name or "")
-    return name.strip().rstrip(".") or "Untitled"
 
 
 def split_markdown_table_row(line):
@@ -376,8 +360,6 @@ def node_matches(node, text, text_no_spaces):
     return any(keyword_matches_text(keyword, text, text_no_spaces) for keyword in node.keywords)
 
 
-def is_prefix(prefix, path):
-    return len(prefix) <= len(path) and tuple(path[: len(prefix)]) == tuple(prefix)
 
 
 def qualify_keyword_path(path, primary_path, tree, text, text_no_spaces):
@@ -540,77 +522,16 @@ def extract_date_prefix(log_name):
     return match.group(1) if match else None
 
 
-def escape_markdown_link_label(value):
-    return (
-        str(value)
-        .replace("\\", "\\\\")
-        .replace("[", "\\[")
-        .replace("]", "\\]")
-    )
 
 
-def make_markdown_link(from_rel_path, target_rel_path, label=None):
-    source_dir = os.path.dirname(normalize_rel_path(from_rel_path)) or "."
-    target = normalize_rel_path(target_rel_path)
-    relative_target = normalize_rel_path(os.path.relpath(target, source_dir))
-    encoded_target = quote(relative_target, safe="/-._~")
-    display_text = label or os.path.splitext(os.path.basename(target))[0]
-    return f"[{escape_markdown_link_label(display_text)}]({encoded_target})"
 
 
-IMAGE_TOKEN_RE = re.compile(
-    r"!\[\[([^\]]+)\]\]|!\[([^\]\n]*)\]\(([^)\n]+)\)"
-)
 
 
-def _normalize_image_target(raw_target):
-    target = unquote(str(raw_target or "").strip())
-    target = target.split("#", 1)[0].strip()
-    target = target.split("|", 1)[0].strip()
-    if target.startswith("<") and target.endswith(">"):
-        target = target[1:-1].strip()
-    return target
 
 
-def _is_within_directory(path, directory):
-    try:
-        return os.path.commonpath([os.path.realpath(path), os.path.realpath(directory)]) == os.path.realpath(directory)
-    except ValueError:
-        return False
 
 
-def _resolve_source_image_path(raw_target, source_filepath, vault_dir):
-    target = _normalize_image_target(raw_target)
-    if not target or urlsplit(target).scheme:
-        return None
-
-    vault_root = os.path.realpath(os.path.abspath(vault_dir))
-    source_dir = os.path.dirname(os.path.abspath(source_filepath))
-    candidates = []
-    if os.path.isabs(target):
-        candidates.append(target)
-    else:
-        candidates.extend(
-            (
-                os.path.join(source_dir, target),
-                os.path.join(vault_root, target),
-                os.path.join(vault_root, "attachments", os.path.basename(target)),
-            )
-        )
-
-    for candidate in candidates:
-        resolved = os.path.realpath(os.path.abspath(candidate))
-        if _is_within_directory(resolved, vault_root) and os.path.isfile(resolved):
-            return resolved
-
-    basename = os.path.basename(target)
-    for root, _dirs, files in os.walk(vault_root):
-        for filename in files:
-            if filename.casefold() == basename.casefold():
-                resolved = os.path.realpath(os.path.join(root, filename))
-                if _is_within_directory(resolved, vault_root):
-                    return resolved
-    return None
 
 
 def rewrite_image_links_for_generated_document(content, source_filepath, generated_rel_path, vault_dir):
@@ -1190,325 +1111,13 @@ def build_subject_content(
     return "".join(lines)
 
 
-def source_date_key(value):
-    stem = os.path.splitext(os.path.basename(value))[0]
-    dotted = re.match(r"^(\d{2})\.(\d{2})\.(\d{2})", stem)
-    if dotted:
-        return f"20{dotted.group(1)}-{dotted.group(2)}-{dotted.group(3)}"
-    compact = re.match(r"^(\d{2})(\d{2})(\d{2})", stem)
-    if compact:
-        return f"20{compact.group(1)}-{compact.group(2)}-{compact.group(3)}"
-    return "0000-00-00"
-
-
-def extract_review_text(content):
-    cleaned = []
-    in_code_block = False
-    for raw_line in content.splitlines():
-        line = raw_line.strip()
-        if line.startswith("```"):
-            in_code_block = not in_code_block
-            continue
-        if in_code_block or not line:
-            continue
-        if line.startswith("#") or line.startswith("![[") or line.startswith("![]("):
-            continue
-        if line in {"---", "***", "___"} or re.fullmatch(r"\|?\s*:?[-]+.*", line):
-            continue
-        if line.startswith("|") and line.endswith("|"):
-            continue
-        line = re.sub(r"^>\s*(?:\[![^]]+\]\s*)?", "", line).strip()
-        if line.startswith("#"):
-            continue
-        line = re.sub(r"^[-*+]\s+", "", line).strip()
-        line = re.sub(r"^\d+[.)]\s+", "", line).strip()
-        if not line:
-            continue
-        cleaned.append(re.sub(r"\s+", " ", line)[:240])
-
-    summaries = cleaned[:2]
-    issue_lines = []
-    lowered_keywords = tuple(keyword.casefold() for keyword in ISSUE_HINT_KEYWORDS)
-    for line in cleaned:
-        lowered = line.casefold()
-        if any(keyword in lowered for keyword in lowered_keywords):
-            issue_lines.append(line)
-        if len(issue_lines) >= 3:
-            break
-    return summaries, issue_lines
-
-
-def merge_review_records(records):
-    merged = {}
-    for record in records:
-        key = record.get("source_id") or f"{record['source_path']}:{record['source_line']}"
-        current = merged.get(key)
-        if current is None:
-            current = dict(record)
-            current["subject_documents"] = []
-            current["matched_categories"] = []
-            current["summary_lines"] = list(record.get("summary_lines", []))
-            current["issue_lines"] = list(record.get("issue_lines", []))
-            merged[key] = current
-
-        document = (
-            record["generated_path"],
-            tuple(record["category_path"]),
-            record["title"],
-        )
-        if document not in current["subject_documents"]:
-            current["subject_documents"].append(document)
-        category = tuple(record["category_path"])
-        if category not in current["matched_categories"]:
-            current["matched_categories"].append(category)
-        for summary in record.get("summary_lines", []):
-            if summary not in current["summary_lines"] and len(current["summary_lines"]) < 2:
-                current["summary_lines"].append(summary)
-        for issue in record.get("issue_lines", []):
-            if issue not in current["issue_lines"]:
-                current["issue_lines"].append(issue)
-
-    values = list(merged.values())
-    for record in values:
-        record["subject_documents"].sort(key=lambda value: (value[1], value[0]))
-        record["matched_categories"].sort()
-        record["generated_path"] = record["subject_documents"][0][0]
-    values.sort(
-        key=lambda value: (
-            source_date_key(value["source_log"]),
-            value["source_path"],
-            value["source_line"],
-        )
-    )
-    return values
-
-
-def append_review_record(
-    lines,
-    record,
-    category_path,
-    review_rel_path,
-    include_source_id=False,
-):
-    subject_path, _full_category, _title = record["subject_documents"][0]
-    subject_link = make_markdown_link(review_rel_path, subject_path, record["title"])
-    source_link = make_markdown_link(
-        review_rel_path,
-        record["source_path"],
-        record["source_log"],
-    )
-    source_id_part = (
-        f" / Source ID: `{record['source_id']}`" if include_source_id else ""
-    )
-    lines.append(f"- {subject_link} / 원본: {source_link}{source_id_part}\n")
-
-    if len(record["subject_documents"]) > 1:
-        links = []
-        for path, full_category, _document_title in record["subject_documents"]:
-            relative_category = full_category[len(category_path):]
-            label = " > ".join(relative_category) or full_category[-1]
-            links.append(make_markdown_link(review_rel_path, path, label))
-        lines.append(f"  - 하위 문서: {', '.join(links)}\n")
-    if record["summary_lines"]:
-        lines.append(f"  - {record['summary_lines'][0]}\n")
 
 
 def write_reviews(vault_dir, review_dir_name, generated_records, dry_run=False):
-    grouped = defaultdict(list)
-    for record in generated_records:
-        full_path = tuple(record["category_path"])
-        for depth in range(1, len(full_path) + 1):
-            grouped[full_path[:depth]].append(record)
-
-    merged_groups = {
-        category_path: merge_review_records(records)
-        for category_path, records in grouped.items()
-    }
-    group_paths = set(merged_groups)
-    children = {
-        category_path: sorted(
-            child
-            for child in group_paths
-            if len(child) == len(category_path) + 1 and is_prefix(category_path, child)
-        )
-        for category_path in group_paths
-    }
-    review_paths = {}
-    for category_path in group_paths:
-        leaf = category_path[-1]
-        prefix = "[종합 리뷰]" if children[category_path] else "[리뷰]"
-        review_paths[category_path] = normalize_rel_path(
-            os.path.join(
-                review_dir_name,
-                *category_path,
-                f"{prefix} {sanitize_filename(leaf)}.md",
-            )
-        )
-
-    desired = {}
-    for category_path in sorted(group_paths):
-        review_rel_path = review_paths[category_path]
-        records = merged_groups[category_path]
-        child_paths = children[category_path]
-        leaf = category_path[-1]
-        is_aggregate = bool(child_paths)
-        detail_limit = 20 if len(category_path) == 1 else 50 if len(category_path) == 2 else None
-        detail_records = records[-detail_limit:] if detail_limit else records
-        omitted_count = len(records) - len(detail_records)
-        recent_records = list(reversed(detail_records[-5:]))
-        issue_limit = 20 if len(category_path) <= 2 else 12
-        issue_items = []
-        for record in reversed(records):
-            for issue_line in record["issue_lines"]:
-                item = (record, issue_line)
-                if item not in issue_items:
-                    issue_items.append(item)
-                if len(issue_items) >= issue_limit:
-                    break
-            if len(issue_items) >= issue_limit:
-                break
-
-        source_logs = {record["source_path"] for record in records}
-        heading_label = "종합 리뷰" if is_aggregate else "리뷰"
-        latest_link = (
-            make_markdown_link(
-                review_rel_path,
-                recent_records[0]["generated_path"],
-                recent_records[0]["title"],
-            )
-            if recent_records
-            else "-"
-        )
-        lines = [
-            AUTO_GENERATED_REVIEW + "\n",
-            f"# {leaf} {heading_label}\n\n",
-            f"**Category**: {' > '.join(category_path)}\n",
-            f"**Entries**: {len(records)}\n",
-            f"**Source Logs**: {len(source_logs)}\n\n",
-            "---\n\n",
-            "## 리뷰 스냅샷\n\n",
-            f"- 최신 기록: {latest_link}\n",
-            f"- 관련 원본 로그 수: {len(source_logs)}\n",
-            f"- 확인할 이슈 후보: {len(issue_items)}\n\n",
-        ]
-
-        if child_paths:
-            lines.append("## 하위 리뷰\n\n")
-            for child_path in child_paths:
-                child_link = make_markdown_link(
-                    review_rel_path,
-                    review_paths[child_path],
-                    child_path[-1],
-                )
-                lines.append(
-                    f"- {child_link} / 소스 {len(merged_groups[child_path])}건\n"
-                )
-            lines.append("\n")
-
-        lines.append("## 최근 업데이트\n\n")
-        if recent_records:
-            for record in recent_records:
-                append_review_record(lines, record, category_path, review_rel_path)
-        else:
-            lines.append("- 최근 업데이트가 없습니다.\n")
-
-        lines.append("\n## 진행 흐름\n\n")
-        if omitted_count:
-            lines.append(
-                f"- 상위 리뷰에서는 최근 {len(detail_records)}건을 표시합니다. "
-                f"이전 {omitted_count}건은 하위 리뷰에서 확인할 수 있습니다.\n"
-            )
-        current_date = None
-        for record in detail_records:
-            date_key = source_date_key(record["source_log"])
-            if date_key != current_date:
-                current_date = date_key
-                if date_key != "0000-00-00":
-                    lines.append(f"\n### {date_key}\n\n")
-            append_review_record(
-                lines,
-                record,
-                category_path,
-                review_rel_path,
-                include_source_id=True,
-            )
-
-        lines.append("\n## 확인할 이슈 후보\n\n")
-        if issue_items:
-            for record, issue_line in issue_items:
-                subject_link = make_markdown_link(
-                    review_rel_path,
-                    record["generated_path"],
-                    record["title"],
-                )
-                lines.append(f"- {subject_link}: {issue_line}\n")
-        else:
-            lines.append("- 자동 추출된 이슈 후보가 없습니다.\n")
-
-        lines.append("\n## 관련 소스 문서\n\n")
-        if omitted_count:
-            lines.append(f"- 최근 {len(detail_records)}건만 표시합니다.\n")
-        for record in detail_records:
-            append_review_record(
-                lines,
-                record,
-                category_path,
-                review_rel_path,
-                include_source_id=True,
-            )
-
-        desired[review_rel_path] = "".join(lines)
-
-    if not dry_run:
-        for rel_path, content in desired.items():
-            full_path = os.path.join(vault_dir, rel_path)
-            os.makedirs(os.path.dirname(full_path), exist_ok=True)
-            with open(full_path, "w", encoding="utf-8") as file_obj:
-                file_obj.write(content)
-        cleanup_generated_root(vault_dir, review_dir_name, set(desired), AUTO_GENERATED_REVIEW)
-    return sorted(desired)
+    from review_renderer import write_reviews as render_reviews
+    return render_reviews(vault_dir, review_dir_name, generated_records, dry_run=dry_run)
 
 
-def cleanup_generated_root(vault_dir, root_name, desired_paths, marker):
-    root_path = os.path.join(vault_dir, root_name)
-    if not os.path.isdir(root_path):
-        return 0
-    desired = {os.path.normcase(os.path.normpath(path)) for path in desired_paths}
-    deleted = 0
-    for dirpath, _dirnames, filenames in os.walk(root_path):
-        for filename in filenames:
-            if not filename.casefold().endswith(".md"):
-                continue
-            full_path = os.path.join(dirpath, filename)
-            rel_path = os.path.relpath(full_path, vault_dir)
-            if os.path.normcase(os.path.normpath(rel_path)) in desired:
-                continue
-            try:
-                with open(full_path, "r", encoding="utf-8") as file_obj:
-                    first_line = file_obj.readline().strip()
-                marker_kind = (
-                    "hierarchical subject"
-                    if marker == AUTO_GENERATED_SUBJECT
-                    else "hierarchical review"
-                )
-                is_managed_marker = (
-                    first_line.startswith("<!-- AUTO-GENERATED: ")
-                    and first_line.endswith(f" {marker_kind}. -->")
-                )
-                if first_line == marker or is_managed_marker:
-                    os.remove(full_path)
-                    deleted += 1
-            except OSError:
-                pass
-    for dirpath, _dirnames, _filenames in os.walk(root_path, topdown=False):
-        if dirpath == root_path:
-            continue
-        try:
-            if not os.listdir(dirpath):
-                os.rmdir(dirpath)
-        except OSError:
-            pass
-    return deleted
 
 
 def write_report(report_path, stats, issues, dry_run):
@@ -1825,8 +1434,9 @@ def _main_unlocked(argv=None):
                     stats["missing_level1"] += 1
 
                 generated_paths = []
-                summary_lines, issue_lines = extract_review_text(
-                    classification["content"]
+                review_blocks = extract_review_blocks(
+                    "\n".join(unit.lines), source_rel_path, source_id,
+                    start_line=unit.start_line, root_title=unit.title,
                 )
                 for path in classification["paths"]:
                     if classification["basis_by_path"][path] == "keyword-refinement":
@@ -1860,8 +1470,7 @@ def _main_unlocked(argv=None):
                             "title": unit.title,
                             "category_path": list(path),
                             "generated_path": rel_path,
-                            "summary_lines": summary_lines,
-                            "issue_lines": issue_lines,
+                            "review_blocks": review_blocks,
                         }
                     )
 

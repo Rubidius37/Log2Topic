@@ -236,8 +236,8 @@ class LocalFirstEntrypointTests(unittest.TestCase):
         content = read_repo_file("README.md")
 
         self.assertIn("# Log2Topic", content)
-        self.assertIn("## 평소 사용 방법", content)
-        self.assertIn("개인 지식 위키", content)
+        self.assertIn("## 처음 시작하기", content)
+        self.assertIn("Markdown 기록 도구", content)
         self.assertIn("## 선택 사항: 외부 서비스", content)
         self.assertIn("Log2Topic.exe", content)
         self.assertIn("로컬 문서 갱신", content)
