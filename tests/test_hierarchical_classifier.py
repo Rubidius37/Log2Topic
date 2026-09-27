@@ -87,7 +87,7 @@ class HierarchicalClassifierTests(unittest.TestCase):
             "![[Pasted image 20260828134722.png]]"
         )
         generated_path = (
-            "Subject/Device Modeling/SampleDevice/Active Burst Block/260828.md"
+            "Subject/Device Modeling/Sample Device/Active Burst Block/260828.md"
         )
         rewritten = rewrite_image_links_for_generated_document(
             content, source_path, generated_path, self.temp_dir.name

@@ -33,6 +33,7 @@ runtime/python/
 .agents/
 .codex/
 .gemini/
+/AGENTS.md
 
 # OS/editor noise
 Thumbs.db
@@ -45,3 +46,4 @@ Desktop.ini
 /docs/REVIEW_REFACTORING_HANDOFF.md
 /docs/UPPER_REVIEW_IMPLEMENTATION_PLAN.md
 /docs/CONCEPT_LINKS_IMPLEMENTATION_PLAN.md
+/docs/verification/
