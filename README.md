@@ -21,8 +21,8 @@ Log2Topic은 **일지를 한 번 작성하면 주제별 문서와 날짜별 흐�
 
 | Before · 날짜별로 작성 | After · 주제별로 확인 |
 | :--- | :--- |
-| **9/1 일지**에 기능 테스트와 회귀 테스트를 함께 기록 | **기능 테스트 리뷰**에 9/1·9/2 기록을 날짜순으로 표시 |
-| **9/2 일지**에 기능 테스트를 이어서 기록 | **회귀 테스트**는 별도 주제 문서로 분류 |
+| **9/1 일지**에 기능 테스트와 회귀 테스트를 함께 기록 | **기능 테스트 상세 리뷰**에 9/2·9/1 기록을 최신순으로 표시 |
+| **9/2 일지**에 기능 테스트를 이어서 기록 | **회귀 테스트**는 별도 리뷰와 주제 문서로 분류 |
 | 같은 주제의 내용을 여러 일지에서 찾아야 함 | 리뷰의 발췌를 읽고 링크로 원본에 이동 |
 
 <table>
@@ -32,11 +32,11 @@ Log2Topic은 **일지를 한 번 작성하면 주제별 문서와 날짜별 흐�
 </tr>
 <tr>
 <td valign="top"><a href="assets/readme-actual-before.png"><img src="assets/readme-actual-before.png" alt="9월 1일과 2일의 원본 일지 Markdown" width="100%"></a></td>
-<td valign="top"><a href="assets/readme-actual-after.png"><img src="assets/readme-actual-after.png" alt="두 날짜의 기능 테스트 기록이 모인 실제 생성 리뷰" width="100%"></a></td>
+<td valign="top"><a href="assets/readme-actual-after.png"><img src="assets/readme-actual-after.png" alt="9월 2일과 1일의 기능 테스트 기록이 최신순으로 표시된 상세 리뷰" width="100%"></a></td>
 </tr>
 </table>
 
-*이미지를 클릭하면 크게 볼 수 있습니다.</br> - 예시 일지 2개를 실제 분류기로 처리한 파일을 브라우저에서 캡처했습니다. 오른쪽은 생성된 Markdown 리뷰의 읽기 화면입니다.*
+*이미지를 클릭하면 크게 볼 수 있습니다. 예시 일지 2개를 실제 분류기로 처리하고, 생성된 Level 4 「Functional Test」 상세 리뷰를 브라우저에서 캡처했습니다.*
 
 작성·수정은 **`Daily_Logs/`**, 주제별 본문은 **`Subject/`**에서 확인합니다. **`Topic_Reviews/`**의 Level 1은 목차, Level 2는 최근 본문 최대 5건의 개요, Level 3~5는 원문 발췌를 읽는 상세 문서입니다. 미분류 리뷰는 원본 링크 목록으로 표시합니다. 생략된 기록은 하위 리뷰와 Subject 폴더에서 찾아볼 수 있습니다. 별도 요약문이나 체크박스 작성은 필요하지 않습니다.
 
