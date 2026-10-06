@@ -22,8 +22,8 @@ using System.Windows.Forms;
 [assembly: AssemblyCompany("Log2Topic")]
 [assembly: AssemblyProduct("Log2Topic")]
 [assembly: AssemblyCopyright("Copyright (c) 2026 Log2Topic contributors")]
-[assembly: AssemblyVersion("1.0.13.0")]
-[assembly: AssemblyFileVersion("1.0.13.0")]
+[assembly: AssemblyVersion("1.0.14.0")]
+[assembly: AssemblyFileVersion("1.0.14.0")]
 
 namespace Log2TopicDesktop
 {

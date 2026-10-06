@@ -555,7 +555,7 @@ def extract_date_prefix(log_name):
 
 def rewrite_image_links_for_generated_document(content, source_filepath, generated_rel_path, vault_dir):
     generated_filepath = os.path.join(vault_dir, generated_rel_path.replace("/", os.sep))
-    generated_dir = os.path.dirname(os.path.abspath(generated_filepath))
+    generated_dir = os.path.dirname(os.path.realpath(generated_filepath))
 
     def replace_image(match):
         raw_target = match.group(1) or match.group(3)

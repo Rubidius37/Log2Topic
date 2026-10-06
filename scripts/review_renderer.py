@@ -42,9 +42,10 @@ def _relative_link(review_path, target_path, label):
 
 
 def _rewrite_local_links(text, record, review_path, vault_dir):
+    vault_dir = os.path.realpath(vault_dir)
     source_path = os.path.join(vault_dir, record["source_path"].replace("/", os.sep))
     source_dir = os.path.dirname(source_path)
-    review_dir = os.path.dirname(os.path.join(vault_dir, review_path.replace("/", os.sep)))
+    review_dir = os.path.dirname(os.path.realpath(os.path.join(vault_dir, review_path.replace("/", os.sep))))
 
     def image(match):
         raw_target = match.group(1) or match.group(3)

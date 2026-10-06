@@ -383,7 +383,7 @@ class ParallelRootSyncTests(unittest.TestCase):
                 )
                 build_image_asset_manifest("![[shared.png]]\n", temp_dir)
 
-        hasher.assert_called_once_with(os.path.abspath(image_path))
+        hasher.assert_called_once_with(os.path.realpath(os.path.abspath(image_path)))
 
     def test_changed_image_bytes_force_page_update_with_unchanged_markdown(self):
         with tempfile.TemporaryDirectory() as temp_dir:
