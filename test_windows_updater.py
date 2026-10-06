@@ -139,7 +139,8 @@ Wait-UpdateProcessExit -ProcessId 123
 
     def run_install(self, mode):
         with tempfile.TemporaryDirectory(prefix="Log2Topic-updater-test-") as temp:
-            root = Path(temp)
+            # Windows runners can return an 8.3 TEMP path; the updater expands it.
+            root = Path(temp).resolve()
             install = root / "install"
             install.mkdir()
             (install / "Log2Topic.exe").write_text("old executable")
