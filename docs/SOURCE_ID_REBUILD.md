@@ -1,5 +1,13 @@
 # Replacing source logs
 
+## Heading changes
+
+After editing classification headings, run the normal local update. If the current rules merge several Source ID comments into one source unit, the classifier keeps the ID immediately below the classification heading (ignoring blank lines), or the first ID in that unit if none is there. It removes the other active ID comments and places the retained ID directly below the heading. Body text, nested headings, quoted ID comments, and fenced code examples are preserved. Headings and ID comments inside fenced code are treated as example content. Originals are backed up under `scripts/source_id_backups/automatic` before replacement.
+
+IDs shared by different source units or files still produce an error. `scripts/run_local.bat --dry-run` lists each planned consolidation with its retained and removed IDs without changing source documents, generated documents, or metadata. A normal update also removes obsolete generated documents belonging to discarded IDs. You do not need to rebuild every ID for a heading change.
+
+## Replacing an entire source corpus
+
 Use this procedure when replacing `Workspace/Daily_Logs` with a source-log corpus from another installation.
 
 1. Close any running local update or Notion sync.

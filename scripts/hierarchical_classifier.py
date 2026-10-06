@@ -55,22 +55,38 @@ def is_markdown_blockquote_line(line):
     return line.lstrip(" \t").startswith(">")
 
 
+def source_lines_with_code_context(content, keepends=False):
+    """Keep fenced code examples out of headings and permanent ID handling."""
+    fence = None
+    for line in content.splitlines(keepends=keepends):
+        match = re.match(r"^[ \t]{0,3}(`{3,}|~{3,})([^\r\n]*)", line)
+        in_code = fence is not None
+        if match:
+            marker, suffix = match.groups()
+            if fence is None and (marker[0] != "`" or "`" not in suffix):
+                fence = marker
+                in_code = True
+            elif fence is not None and marker[0] == fence[0] and len(marker) >= len(fence) and not suffix.strip():
+                fence = None
+        yield line, in_code
+
+
 def iter_active_source_id_matches(content):
     """Yield Source ID markers that belong to the source document itself.
 
     Source ID comments inside Markdown blockquotes are quoted material, not
     identifiers for the surrounding classification unit.
     """
-    for line in content.splitlines():
-        if is_markdown_blockquote_line(line):
+    for line, in_code in source_lines_with_code_context(content):
+        if in_code or is_markdown_blockquote_line(line):
             continue
         yield from SOURCE_ID_RE.finditer(line)
 
 
 def replace_active_source_id_comments(content, replacement):
     lines = []
-    for line in content.splitlines(keepends=True):
-        if is_markdown_blockquote_line(line):
+    for line, in_code in source_lines_with_code_context(content, keepends=True):
+        if in_code or is_markdown_blockquote_line(line):
             lines.append(line)
         else:
             lines.append(SOURCE_ID_RE.sub(replacement, line))
@@ -264,11 +280,14 @@ class SourceMarkerPlan:
     document_root_count: int
     normalized_marker_count: int = 0
     relocations: list = field(default_factory=list)
+    consolidations: list = field(default_factory=list)
 
 
-def parse_markdown_into_units(filepath, tree):
-    with open(filepath, "r", encoding="utf-8") as file_obj:
-        lines = file_obj.read().splitlines()
+def parse_markdown_into_units(filepath, tree, content=None):
+    if content is None:
+        with open(filepath, "r", encoding="utf-8") as file_obj:
+            content = file_obj.read()
+    lines = content.splitlines()
 
     log_name = os.path.splitext(os.path.basename(filepath))[0].strip()
     category_context = ()
@@ -283,8 +302,8 @@ def parse_markdown_into_units(filepath, tree):
             units.append(current)
         current = None
 
-    for line_number, line in enumerate(lines, 1):
-        match = HEADING_RE.match(line)
+    for line_number, (line, in_code) in enumerate(source_lines_with_code_context(content), 1):
+        match = None if in_code else HEADING_RE.match(line)
         if not match:
             if current is None:
                 current = SourceUnit(log_name, [], category_context, tuple(), line_number)
@@ -416,7 +435,7 @@ def extract_manual_categories(content, tree):
 
 def classify_unit(unit, tree, level1_hint=None):
     manual_paths, invalid_manual, clean_content = extract_manual_categories(unit.content, tree)
-    clean_content = SOURCE_ID_RE.sub("", clean_content).strip()
+    clean_content = replace_active_source_id_comments(clean_content, "").strip()
     if manual_paths:
         return {
             "paths": sorted(set(manual_paths)),
@@ -679,8 +698,8 @@ def source_id_comment(source_id):
 
 def unit_source_id_markers(unit):
     markers = []
-    for offset, line in enumerate(unit.lines):
-        if is_markdown_blockquote_line(line):
+    for offset, (line, in_code) in enumerate(source_lines_with_code_context("\n".join(unit.lines))):
+        if in_code or is_markdown_blockquote_line(line):
             continue
         for match in SOURCE_ID_RE.finditer(line):
             markers.append((unit.start_line + offset, match.group(1).lower()))
@@ -730,7 +749,7 @@ def normalize_source_id_comments(content):
     return replace_active_source_id_comments(content, replace), changed
 
 
-def render_source_id_markers(original_content, markers, relocations=()):
+def render_source_id_markers(original_content, markers, relocations=(), consolidations=()):
     newline = "\r\n" if "\r\n" in original_content else "\n"
     had_final_newline = original_content.endswith(("\n", "\r"))
     normalized_content, normalized_count = normalize_source_id_comments(original_content)
@@ -739,7 +758,12 @@ def render_source_id_markers(original_content, markers, relocations=()):
     relocated_ids = {
         source_id.lower() for _source_line, _target_line, source_id in relocations
     }
-    for source_line, _target_line, _source_id in sorted(relocations, reverse=True):
+    removal_lines = {source_line for source_line, _, _ in relocations}
+    consolidation_targets = {start for start, _, _ in consolidations}
+    for _start, _keep, found in consolidations:
+        removal_lines.update(line for line, _source_id in found)
+        relocated_ids.update(source_id for _line, source_id in found)
+    for source_line in sorted(removal_lines, reverse=True):
         source_index = source_line - 1
         if source_index < 0 or source_index >= len(lines):
             raise RuntimeError(f"Invalid Source ID relocation line {source_line}.")
@@ -778,7 +802,10 @@ def render_source_id_markers(original_content, markers, relocations=()):
             if frontmatter_end is not None and insert_index <= frontmatter_end:
                 insert_index = frontmatter_end + 1
             placement = "document-root"
-        while insert_index < len(lines) and not lines[insert_index].strip():
+        while (
+            line_number not in consolidation_targets
+            and insert_index < len(lines) and not lines[insert_index].strip()
+        ):
             insert_index += 1
         pending.append((insert_index, source_id, placement))
         existing_ids.add(source_id)
@@ -828,6 +855,7 @@ def build_source_marker_plans(
 ):
     plans = []
     used_ids = set()
+    marker_owners = {}
     existing_count = 0
 
     for root, dirnames, filenames in os.walk(daily_logs_dir):
@@ -847,11 +875,23 @@ def build_source_marker_plans(
                     )
 
             relocations = find_source_id_relocations(units, tree)
+            # Check every original ID before discarding any of them. An ID shared
+            # by different units/files must never disappear through consolidation.
+            for unit in units:
+                owner = (source_rel_path, unit.start_line)
+                for _line, source_id in unit_source_id_markers(unit):
+                    if source_id in marker_owners and marker_owners[source_id] != owner:
+                        raise RuntimeError(
+                            f"Duplicate permanent Source ID '{source_id}' in "
+                            f"{source_rel_path}:{unit.start_line}"
+                        )
+                    marker_owners[source_id] = owner
             relocated_targets = {
                 target_line: source_id
                 for _source_line, target_line, source_id in relocations
             }
             markers = []
+            consolidations = []
             heading_count = 0
             document_root_count = 0
             for unit in units:
@@ -860,16 +900,26 @@ def build_source_marker_plans(
                 classification = classify_unit(unit, tree)
                 if is_meaningless_content(classification["content"]):
                     continue
-                found_markers = [
-                    match.group(1) for match in iter_active_source_id_matches(unit.content)
-                ]
+                found_markers = unit_source_id_markers(unit)
                 if len(found_markers) > 1:
-                    raise RuntimeError(
-                        f"Multiple Source ID markers belong to one source unit: "
-                        f"{source_rel_path}:{unit.start_line}"
-                    )
+                    next_line = unit.start_line + 1
+                    for offset, line in enumerate(unit.lines[1:], 1):
+                        if line.strip():
+                            next_line = unit.start_line + offset
+                            break
+                    keep = found_markers[0][1]
+                    if unit.lines and HEADING_RE.match(unit.lines[0]):
+                        keep = next((source_id for line, source_id in found_markers
+                                     if line == next_line), keep)
+                    consolidations.append((unit.start_line, keep, found_markers))
+                    identity_content = source_id_comment(keep) + "\n" + replace_active_source_id_comments(unit.content, "")
+                else:
+                    identity_content = unit.content
                 relocated_id = relocated_targets.get(unit.start_line)
                 if relocated_id:
+                    resolve_source_id(source_rel_path, unit, source_id_comment(relocated_id),
+                                      new_indexes, legacy_indexes, used_ids,
+                                      allow_legacy_heading=allow_legacy_heading)
                     markers.append((unit.start_line, relocated_id))
                     existing_count += 1
                     first_line = unit.content.splitlines()[0] if unit.content else ""
@@ -881,15 +931,17 @@ def build_source_marker_plans(
                 source_id = resolve_source_id(
                     source_rel_path,
                     unit,
-                    unit.content,
+                    identity_content,
                     new_indexes,
                     legacy_indexes,
                     used_ids,
                     allow_legacy_heading=allow_legacy_heading,
                 )
-                if found_markers:
+                if found_markers and len(found_markers) == 1:
                     existing_count += 1
                     continue
+                if found_markers:
+                    existing_count += 1
                 markers.append((unit.start_line, source_id))
                 first_line = unit.content.splitlines()[0] if unit.content else ""
                 if HEADING_RE.match(first_line):
@@ -911,6 +963,7 @@ def build_source_marker_plans(
                         document_root_count=document_root_count,
                         normalized_marker_count=normalized_marker_count,
                         relocations=relocations,
+                        consolidations=consolidations,
                     )
                 )
     return plans, existing_count
@@ -941,7 +994,7 @@ def persist_source_marker_plans(plans, backup_root, vault_dir, dry_run=False):
                 rendered_roots,
                 rendered_normalized,
             ) = render_source_id_markers(
-                plan.original_content, plan.markers, plan.relocations
+                plan.original_content, plan.markers, plan.relocations, plan.consolidations
             )
             if (
                 inserted != len(plan.markers)
@@ -1136,6 +1189,8 @@ def write_report(report_path, stats, issues, dry_run):
         f"- Existing Source ID markers: {stats['source_id_markers_existing']}\n",
         f"- Source ID markers inserted: {stats['source_id_markers']}\n",
         f"- Source ID markers normalized: {stats['source_id_markers_normalized']}\n",
+        f"- Source units consolidated: {stats.get('source_id_units_consolidated', 0)}\n",
+        f"- Extra Source ID markers removed: {stats.get('source_id_markers_removed', 0)}\n",
         f"- Document-root markers inserted: {stats['source_id_document_root_markers']}\n\n",
         "## Review Items\n\n",
     ]
@@ -1316,7 +1371,9 @@ def _main_unlocked(argv=None):
     except (TypeError, ValueError):
         previous_schema_version = 0
     allow_legacy_heading_fallback = previous_schema_version < METADATA_SCHEMA_VERSION
-    persist_source_ids = should_persist_source_ids(args)
+    persist_source_ids = should_persist_source_ids(args) or (
+        args.dry_run and not args.no_persist_source_ids
+    )
 
     source_id_marker_count = 0
     source_id_heading_marker_count = 0
@@ -1324,6 +1381,8 @@ def _main_unlocked(argv=None):
     source_id_normalized_marker_count = 0
     source_id_existing_marker_count = 0
     source_id_backup_batch = None
+    marker_plans = []
+    preview_sources = {}
     rebuild_backup_batch = None
     if args.rebuild_source_ids:
         if not args.production:
@@ -1349,6 +1408,17 @@ def _main_unlocked(argv=None):
                 legacy_indexes,
                 allow_legacy_heading=allow_legacy_heading_fallback,
             )
+            if args.dry_run:
+                for plan in marker_plans:
+                    preview_sources[plan.filepath] = render_source_id_markers(
+                        plan.original_content, plan.markers, plan.relocations,
+                        plan.consolidations,
+                    )[0]
+                    for start, keep, found in plan.consolidations:
+                        remaining = [source_id for _, source_id in found]
+                        remaining.remove(keep)
+                        print(f"Would consolidate {plan.source_rel_path}:{start}: "
+                              f"keep {keep}; remove {', '.join(remaining)}")
             (
                 source_id_marker_count,
                 source_id_heading_marker_count,
@@ -1385,6 +1455,9 @@ def _main_unlocked(argv=None):
         "source_id_heading_markers": source_id_heading_marker_count,
         "source_id_document_root_markers": source_id_document_root_marker_count,
         "source_id_markers_normalized": source_id_normalized_marker_count,
+        "source_id_units_consolidated": sum(len(plan.consolidations) for plan in marker_plans),
+        "source_id_markers_removed": sum(len(found) - 1 for plan in marker_plans
+                                         for _, _, found in plan.consolidations),
     }
 
     for root, dirnames, filenames in os.walk(daily_logs_dir):
@@ -1394,7 +1467,9 @@ def _main_unlocked(argv=None):
                 continue
             filepath = os.path.join(root, filename)
             source_rel_path = normalize_rel_path(os.path.relpath(filepath, vault_dir))
-            log_name, units = parse_markdown_into_units(filepath, tree)
+            log_name, units = parse_markdown_into_units(
+                filepath, tree, content=preview_sources.get(filepath)
+            )
             stats["source_files"] += 1
 
             for unit in units:
@@ -1536,6 +1611,10 @@ def _main_unlocked(argv=None):
     print(f"Needs review: {stats['needs_review']}")
     print(f"Missing Level 1: {stats['missing_level1']}")
     if persist_source_ids:
+        cleanup_action = "would be consolidated" if args.dry_run else "consolidated"
+        print(f"Source units {cleanup_action}: {stats['source_id_units_consolidated']}")
+        removal_action = "would be removed" if args.dry_run else "removed"
+        print(f"Extra Source ID markers {removal_action}: {stats['source_id_markers_removed']}")
         action = "would be inserted" if args.dry_run else "inserted"
         print(f"Existing Source ID markers: {stats['source_id_markers_existing']}")
         print(f"Source ID markers {action}: {stats['source_id_markers']}")

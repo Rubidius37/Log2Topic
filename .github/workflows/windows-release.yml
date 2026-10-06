@@ -19,6 +19,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Test classifier and updater
+        shell: powershell
+        run: |
+          python -B -m unittest discover -s tests
+          if ($LASTEXITCODE -ne 0) { throw "Classifier tests failed." }
+          python -B -m unittest test_windows_updater
+          if ($LASTEXITCODE -ne 0) { throw "Updater tests failed." }
+
       - name: Build Windows app
         shell: powershell
         run: |
@@ -43,7 +51,7 @@ jobs:
           "RELEASE_ARCHIVE_NAME=$archiveName" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           $package = Join-Path $env:RUNNER_TEMP "Log2Topic"
           New-Item -ItemType Directory -Path $package -Force | Out-Null
-          $items = @("Log2Topic.exe", "Log2Topic.bat", "setup_workspace.bat", "app", "assets", "scripts", "runtime", "docs\AUTO_UPDATE.md", "docs\NOTION_INTEGRATION.md", "docs\SOURCE_ID_REBUILD.md", "docs\SYSTEM_REFERENCE.md", "docs\TROUBLESHOOTING.md", "docs\USER_GUIDE.md", "Workspace\Classification_Rules.md", "README.md", "LICENSE")
+          $items = @("Log2Topic.exe", "Log2Topic.bat", "setup_workspace.bat", "app", "assets", "scripts", "runtime", "docs\AUTO_UPDATE.md", "docs\NOTION_INTEGRATION.md", "docs\SOURCE_ID_REBUILD.md", "docs\SYSTEM_REFERENCE.md", "docs\TROUBLESHOOTING.md", "docs\USER_GUIDE.md", "Workspace\Classification_Rules.md", "README.md", "CHANGELOG.md", "LICENSE")
           foreach ($item in $items) {
             $source = Join-Path $env:GITHUB_WORKSPACE $item
             $destination = Join-Path $package $item
@@ -62,5 +70,6 @@ jobs:
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
+          draft: true
           files: ${{ runner.temp }}/${{ env.RELEASE_ARCHIVE_NAME }}
           generate_release_notes: true
