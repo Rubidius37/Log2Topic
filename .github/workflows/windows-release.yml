@@ -52,19 +52,25 @@ jobs:
           $package = Join-Path $env:RUNNER_TEMP "Log2Topic"
           New-Item -ItemType Directory -Path $package -Force | Out-Null
           $items = @("Log2Topic.exe", "Log2Topic.bat", "setup_workspace.bat", "app", "assets", "scripts", "runtime", "docs\AUTO_UPDATE.md", "docs\NOTION_INTEGRATION.md", "docs\SOURCE_ID_REBUILD.md", "docs\SYSTEM_REFERENCE.md", "docs\TROUBLESHOOTING.md", "docs\USER_GUIDE.md", "Workspace\Classification_Rules.md", "README.md", "CHANGELOG.md", "LICENSE")
+          $trackedFiles = @(git ls-files)
+          if ($LASTEXITCODE -ne 0) { throw "Could not list distributable tracked files." }
           foreach ($item in $items) {
             $source = Join-Path $env:GITHUB_WORKSPACE $item
             $destination = Join-Path $package $item
             if (Test-Path -LiteralPath $source -PathType Container) {
-              New-Item -ItemType Directory -Path $destination -Force | Out-Null
-              Copy-Item -Path (Join-Path $source "*") -Destination $destination -Recurse -Force
+              $prefix = $item.Replace('\', '/') + '/'
+              foreach ($file in $trackedFiles) {
+                if (-not $file.StartsWith($prefix, [StringComparison]::Ordinal)) { continue }
+                $fileDestination = Join-Path $package $file
+                New-Item -ItemType Directory -Path (Split-Path -Parent $fileDestination) -Force | Out-Null
+                Copy-Item -LiteralPath (Join-Path $env:GITHUB_WORKSPACE $file) -Destination $fileDestination -Force
+              }
             }
             else {
               New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
               Copy-Item -LiteralPath $source -Destination $destination -Force
             }
           }
-          Remove-Item -LiteralPath (Join-Path $package "scripts\.runtime") -Recurse -Force -ErrorAction SilentlyContinue
           Compress-Archive -Path (Join-Path $package "*") -DestinationPath (Join-Path $env:RUNNER_TEMP $archiveName)
 
       - name: Publish release
