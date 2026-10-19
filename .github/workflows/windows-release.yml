@@ -1,0 +1,132 @@
+name: Windows release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version without the v prefix"
+        required: true
+        type: string
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  test-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run unit tests on Linux
+        run: |
+          chmod +x Log2Topic.sh setup_workspace.sh scripts/*.sh
+          sh ./setup_workspace.sh
+          python3 -B -m unittest discover -s tests
+          sh ./Log2Topic.sh schedule --mode Local --time 02:30 --validate-only
+
+  build:
+    needs: test-linux
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Test classifier and updater
+        shell: powershell
+        run: |
+          python -B -m unittest discover -s tests
+          if ($LASTEXITCODE -ne 0) { throw "Unit and updater tests failed." }
+
+      - name: Build Windows app
+        shell: powershell
+        run: |
+          $version = if ("${{ github.event_name }}" -eq "workflow_dispatch") { "${{ inputs.version }}" } else { "${{ github.ref_name }}".TrimStart("v") }
+          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "Version must use MAJOR.MINOR.PATCH format." }
+          $source = [IO.File]::ReadAllText(
+            (Join-Path $env:GITHUB_WORKSPACE "app\Log2Topic.cs"),
+            (New-Object Text.UTF8Encoding($false)))
+          $source = $source -replace 'AssemblyVersion\("[^"]+"\)', ('AssemblyVersion("' + $version + '.0")')
+          $source = $source -replace 'AssemblyFileVersion\("[^"]+"\)', ('AssemblyFileVersion("' + $version + '.0")')
+          [IO.File]::WriteAllText(
+            (Join-Path $env:GITHUB_WORKSPACE "app\Log2Topic.cs"),
+            $source,
+            (New-Object Text.UTF8Encoding($true)))
+          .\scripts\build_windows_app.ps1
+
+      - name: Create release package
+        shell: powershell
+        run: |
+          $version = if ("${{ github.event_name }}" -eq "workflow_dispatch") { "${{ inputs.version }}" } else { "${{ github.ref_name }}".TrimStart("v") }
+          $archiveName = "Log2Topic-windows-v$version.zip"
+          $linuxArchiveName = "Log2Topic-linux-v$version.tar.gz"
+          "RELEASE_ARCHIVE_NAME=$archiveName" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "LINUX_RELEASE_ARCHIVE_NAME=$linuxArchiveName" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "RELEASE_TITLE=Log2Topic v$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          $package = Join-Path $env:RUNNER_TEMP "Log2Topic"
+          New-Item -ItemType Directory -Path $package -Force | Out-Null
+          $items = @("Log2Topic.exe", "Log2Topic.bat", "Log2Topic.sh", "log2topic.py", "setup_workspace.bat", "setup_workspace.sh", "app", "assets", "scripts", "runtime", "docs\AUTO_UPDATE.md", "docs\NOTION_INTEGRATION.md", "docs\SOURCE_ID_REBUILD.md", "docs\SYSTEM_REFERENCE.md", "docs\TROUBLESHOOTING.md", "docs\USER_GUIDE.md", "Workspace\Classification_Rules.md", "README.md", "README.ko.md", "CHANGELOG.md", "LICENSE")
+          $trackedFiles = @(git ls-files | Where-Object {
+            $_ -notmatch '(^|/)__pycache__/' -and
+            $_ -notmatch '\.(pyc|pyo|log)$' -and
+            $_ -notmatch '^runtime/python/' -and
+            $_ -notmatch '^scripts/(\.runtime|reports|source_id_backups)/' -and
+            $_ -notmatch '^scripts/(organizer_metadata|notion_sync_state|cloudinary_cache).*\.json$'
+          })
+          if ($LASTEXITCODE -ne 0) { throw "Could not list distributable tracked files." }
+          foreach ($item in $items) {
+            $source = Join-Path $env:GITHUB_WORKSPACE $item
+            $destination = Join-Path $package $item
+            if (Test-Path -LiteralPath $source -PathType Container) {
+              $prefix = $item.Replace('\', '/') + '/'
+              foreach ($file in $trackedFiles) {
+                if (-not $file.StartsWith($prefix, [StringComparison]::Ordinal)) { continue }
+                $fileDestination = Join-Path $package $file
+                New-Item -ItemType Directory -Path (Split-Path -Parent $fileDestination) -Force | Out-Null
+                Copy-Item -LiteralPath (Join-Path $env:GITHUB_WORKSPACE $file) -Destination $fileDestination -Force
+              }
+            }
+            else {
+              New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
+              Copy-Item -LiteralPath $source -Destination $destination -Force
+            }
+          }
+          Compress-Archive -Path (Join-Path $package "*") -DestinationPath (Join-Path $env:RUNNER_TEMP $archiveName)
+          $linuxTarPath = Join-Path $env:RUNNER_TEMP $linuxArchiveName
+          python -c "import os, tarfile; root = r'$package'; out = r'$linuxTarPath'; skip_ext = {'.exe', '.bat', '.ps1', '.ico', '.zip'}; skip_dirs = {'app', 'runtime'};
+          with tarfile.open(out, 'w:gz') as tf:
+              for dp, dn, fn in os.walk(root):
+                  dn[:] = sorted(d for d in dn if d not in skip_dirs)
+                  for f in sorted(fn):
+                      if os.path.splitext(f)[1].lower() in skip_ext: continue
+                      full = os.path.join(dp, f)
+                      rel = os.path.relpath(full, root).replace('\\', '/')
+                      ti = tf.gettarinfo(full, arcname='Log2Topic/' + rel)
+                      ti.mode = 0o755 if rel.endswith('.sh') else 0o644
+                      with open(full, 'rb') as fobj: tf.addfile(ti, fobj)"
+          if ($LASTEXITCODE -ne 0) { throw "Could not create Linux release archive." }
+          $winZipPath = Join-Path $env:RUNNER_TEMP $archiveName
+          $winHash = (Get-FileHash -LiteralPath $winZipPath -Algorithm SHA256).Hash.ToLowerInvariant()
+          $linuxHash = (Get-FileHash -LiteralPath $linuxTarPath -Algorithm SHA256).Hash.ToLowerInvariant()
+          [IO.File]::WriteAllText("$winZipPath.sha256", "$winHash  $archiveName`n", (New-Object Text.UTF8Encoding($false)))
+          [IO.File]::WriteAllText("$linuxTarPath.sha256", "$linuxHash  $linuxArchiveName`n", (New-Object Text.UTF8Encoding($false)))
+          $notesPath = Join-Path $env:RUNNER_TEMP "release_notes.md"
+          python -c "import re, pathlib; ver = '$version'; text = pathlib.Path('CHANGELOG.md').read_text(encoding='utf-8'); m = re.search(r'^##\s+' + re.escape(ver) + r'\b[^\n]*\n(.*?)(?=^##\s+|\Z)', text, flags=re.M | re.S); body = m.group(1).strip() if m else ('Release Log2Topic v' + ver); pathlib.Path(r'$notesPath').write_text(body + '\n', encoding='utf-8')"
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ env.RELEASE_TITLE }}
+          draft: false
+          body_path: ${{ runner.temp }}/release_notes.md
+          generate_release_notes: false
+          files: |
+            ${{ runner.temp }}/${{ env.RELEASE_ARCHIVE_NAME }}
+            ${{ runner.temp }}/${{ env.RELEASE_ARCHIVE_NAME }}.sha256
+            ${{ runner.temp }}/${{ env.LINUX_RELEASE_ARCHIVE_NAME }}
+            ${{ runner.temp }}/${{ env.LINUX_RELEASE_ARCHIVE_NAME }}.sha256
