@@ -47,6 +47,7 @@ from process_lock import (
     delegated_lock_environment,
 )
 from workspace_paths import resolve_workspace_dir
+from document_utils import validate_category_name
 
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -714,6 +715,11 @@ def add_classification_rule(
 
     if not 1 <= len(parts) <= CATEGORY_LEVELS:
         raise ReviewError("분류 경로 형식이 올바르지 않습니다.")
+    try:
+        for part in parts:
+            validate_category_name(part)
+    except ValueError as exc:
+        raise ReviewError(str(exc)) from exc
     raw_keywords = str(keywords or "").strip()
     if any("|" in part or "\n" in part or "\r" in part for part in parts) or (
         "|" in raw_keywords or "\n" in raw_keywords or "\r" in raw_keywords

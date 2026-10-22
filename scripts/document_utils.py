@@ -39,6 +39,35 @@ def normalize_rel_path(path):
     return path.replace("\\", "/")
 
 
+def validate_category_name(name):
+    """Require a portable directory name, never a path or Windows device."""
+    if (
+        not name or name in {".", ".."} or name.endswith((".", " "))
+        or re.search(r'[\\/<>:"|?*\x00-\x1f]', name)
+        or re.fullmatch(r"(?:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\..*)?", name, re.I)
+    ):
+        raise ValueError(f"Unsafe category name: {name!r}")
+
+
+def resolve_generated_path(vault_dir, root_name, relative_path):
+    """Reject output paths (including symlinks) outside their generated root."""
+    vault = os.path.realpath(vault_dir)
+    expected_root = os.path.abspath(os.path.join(vault, root_name))
+    root = os.path.realpath(expected_root)
+    target = os.path.realpath(os.path.join(vault, relative_path))
+    try:
+        safe = (
+            os.path.normcase(root) == os.path.normcase(expected_root)
+            and os.path.commonpath([vault, root]) == vault and root != vault
+            and os.path.commonpath([root, target]) == root and target != root
+        )
+    except ValueError:
+        safe = False
+    if not safe:
+        raise ValueError(f"Generated path escapes its output root: {relative_path!r}")
+    return target
+
+
 def sanitize_filename(name):
     name = re.sub(r'[\\/*?:"<>|]', "_", name or "")
     return name.strip().rstrip(".") or "Untitled"

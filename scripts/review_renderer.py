@@ -11,6 +11,7 @@ from document_utils import (
     _resolve_source_image_path, cleanup_generated_root,
     escape_markdown_link_label, make_markdown_link, normalize_rel_path,
     resolve_document_language, source_date_key, strip_markdown_target_title,
+    resolve_generated_path,
 )
 from review_content import select_review_groups
 from review_model import build_review_model
@@ -402,8 +403,12 @@ def _render_category(vault_dir, category, model):
 
 
 def _save_reviews(vault_dir, review_dir_name, desired):
+    destinations = {
+        relative: resolve_generated_path(vault_dir, review_dir_name, relative)
+        for relative in desired
+    }
     for relative, content in desired.items():
-        destination = os.path.join(vault_dir, relative)
+        destination = destinations[relative]
         fs_dest = filesystem_path(destination)
         if os.path.isfile(fs_dest):
             try:

@@ -39,6 +39,8 @@ Notion 설정은 이 과정에서 읽지 않습니다. 트레이의 `로컬 문�
 
 `Workspace/Subject/`, `Workspace/Topic_Reviews/`, metadata는 다시 생성할 수 있는 결과물입니다. 장기 보관해야 할 원문은 `Workspace/Daily_Logs/`입니다.
 
+Python CLI도 분류기와 동일하게 `LOG2TOPIC_WORKSPACE` 환경변수, 설정의 `workspace_path`, 기본 작업공간 순서로 경로를 선택합니다. 예제 일지는 기본 `Workspace/`가 비어 있을 때만 생성하며, 외부 작업공간에는 추가하지 않습니다.
+
 Subject 문서를 생성할 때 원본 일지의 이미지 링크는 원본 문서 위치를 기준으로 먼저 해석한 뒤, 생성된 Subject 문서 위치를 기준으로 상대경로를 다시 계산합니다. 따라서 원본이 Obsidian Wikilink(`![[...]]`)인지 Markdown 이미지 링크(`![](...)`)인지와 관계없이 생성 문서에서 `Workspace/attachments/` 이미지를 열 수 있습니다.
 
 ## 계층형 분류 규칙
@@ -50,6 +52,8 @@ Level 1 > Level 2 > Level 3 > Level 4 > Level 5
 ```
 
 `Workspace/Classification_Rules.md`는 상속형 표입니다. 비어 있는 셀은 같은 열의 바로 위 값을 이어받으므로 하위 경로를 추가할 때 상위 이름을 반복하지 않아도 됩니다.
+
+각 분류명은 폴더 이름으로 사용됩니다. `.`·`..`, 경로 구분자(`/`, `\`), Windows에서 금지하는 파일명 문자·예약 장치명, 끝의 마침표는 사용할 수 없습니다. 잘못된 이름은 규칙 읽기 또는 대시보드 저장 단계에서 거부합니다. 생성 문서를 저장할 때도 실제 경로가 해당 출력 폴더 안에 있는지 검사합니다.
 
 ### Heading 매칭
 
@@ -92,6 +96,8 @@ Category: Methods/Data Analysis/Visualization, Projects/Sample Project/Reporting
 직접 입력하기보다 트레이의 `분류 검토 대시보드 열기`를 사용하는 편이 오타를 줄일 수 있습니다.
 
 ## Source ID
+
+`--dry-run --rebuild-source-ids`를 함께 지정하면 기존 ID 제거와 재분류를 메모리에서 미리 계산합니다. 원본 일지, 생성 문서, 메타데이터와 백업은 변경하지 않으며 백업 보관 개수 정리도 실행하지 않습니다.
 
 생산 분류기는 원본 일지의 각 관리 구간에 영구 Source ID를 부여합니다.
 

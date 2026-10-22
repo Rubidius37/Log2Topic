@@ -11,12 +11,14 @@ SCRIPTS_DIR = os.path.join(ROOT_DIR, "scripts")
 if SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, SCRIPTS_DIR)
 
+from workspace_paths import resolve_workspace_dir
+
 
 def ensure_workspace():
-    workspace_dir = os.path.join(ROOT_DIR, "Workspace")
+    workspace_dir = resolve_workspace_dir(SCRIPTS_DIR)
     rules_path = os.path.join(workspace_dir, "Classification_Rules.md")
     if not os.path.isfile(rules_path):
-        print("[ERROR] Workspace/Classification_Rules.md was not found.", file=sys.stderr)
+        print(f"[ERROR] Classification rules were not found: {rules_path}", file=sys.stderr)
         return False
     daily_dir = os.path.join(workspace_dir, "Daily_Logs")
     attachments_dir = os.path.join(workspace_dir, "attachments")
@@ -29,7 +31,11 @@ def ensure_workspace():
         for _r, _d, files in os.walk(daily_dir)
         for fname in files
     )
-    if not os.path.exists(metadata_path) and not has_md:
+    bundled_workspace = os.path.join(ROOT_DIR, "Workspace")
+    is_bundled = os.path.normcase(os.path.realpath(workspace_dir)) == os.path.normcase(
+        os.path.realpath(bundled_workspace)
+    )
+    if is_bundled and not os.path.exists(metadata_path) and not has_md:
         sample1 = os.path.join(daily_dir, "2026-09-01-log.md")
         sample2 = os.path.join(daily_dir, "2026-09-02-log.md")
         try:

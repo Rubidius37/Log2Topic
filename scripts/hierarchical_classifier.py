@@ -26,6 +26,7 @@ from document_utils import (
     cleanup_generated_root, escape_markdown_link_label, is_prefix,
     make_markdown_link, normalize_rel_path, parse_stem_date,
     sanitize_filename, source_date_key, strip_markdown_target_title,
+    validate_category_name, resolve_generated_path,
 )
 from workspace_paths import resolve_workspace_dir
 from review_content import extract_review_blocks
@@ -184,6 +185,12 @@ class RuleTree:
         return self.nodes[tuple(path)]
 
     def add_rule(self, path, keywords, line_number):
+        try:
+            for name in path:
+                validate_category_name(name)
+        except ValueError as exc:
+            self.errors.append(f"Line {line_number}: {exc}")
+            return
         node = self.ensure_path(path, explicit=True)
         existing = set(node.keywords)
         for keyword in keywords:
@@ -1123,6 +1130,7 @@ def build_source_marker_plans(
     new_indexes,
     legacy_indexes,
     allow_legacy_heading=True,
+    source_contents=None,
 ):
     plans = []
     used_ids = set()
@@ -1144,13 +1152,14 @@ def build_source_marker_plans(
             with open(filepath, "r", encoding="utf-8", newline="") as file_obj:
                 original_content = file_obj.read()
             source_rel_path = normalize_rel_path(os.path.relpath(filepath, vault_dir))
-            _log_name, units = parse_markdown_into_units(filepath, tree)
+            scan_content = (source_contents or {}).get(filepath, original_content)
+            _log_name, units = parse_markdown_into_units(filepath, tree, content=scan_content)
             with open(filepath, "r", encoding="utf-8", newline="") as file_obj:
                 if file_obj.read() != original_content:
                     raise RuntimeError(
                         f"Source file changed while it was being scanned: {source_rel_path}"
                     )
-            scanned_files.append((filepath, source_rel_path, original_content, units))
+            scanned_files.append((filepath, source_rel_path, scan_content, units))
             for unit in units:
                 owner = (source_rel_path, unit.start_line)
                 unit_anchor = make_source_anchor(source_rel_path, unit)
@@ -1648,6 +1657,12 @@ def parse_args(argv=None):
 
 
 def validate_output_targets(args):
+    for name in (args.output_dir, args.review_dir):
+        try:
+            for part in normalize_rel_path(name).split("/"):
+                validate_category_name(part)
+        except ValueError:
+            return "Output directories must be safe relative paths within the workspace."
     output_name = normalize_rel_path(args.output_dir).strip("/")
     review_name = normalize_rel_path(args.review_dir).strip("/")
     metadata_name = os.path.basename(args.metadata_file)
@@ -1672,7 +1687,8 @@ def validate_output_targets(args):
         "daily_logs",
         "attachments",
     }
-    if output_name.casefold() in forbidden_roots or review_name.casefold() in forbidden_roots:
+    if (output_name.split("/")[0].casefold() in forbidden_roots
+            or review_name.split("/")[0].casefold() in forbidden_roots):
         return "Preview mode must not use production or source roots."
     return ""
 
@@ -1730,6 +1746,15 @@ def _main_unlocked(argv=None):
         for error in tree.errors:
             print(f"Rule error: {error}")
         return 2
+    try:
+        for root_name in (args.output_dir, args.review_dir):
+            for category in tree.nodes:
+                resolve_generated_path(
+                    vault_dir, root_name, os.path.join(root_name, *category, "_check.md")
+                )
+    except ValueError as exc:
+        print(f"Error: {exc}")
+        return 2
     if args.validate_rules:
         print(f"Rule validation passed with {len(tree.warnings)} optional-keyword notices.")
         return 0
@@ -1782,13 +1807,27 @@ def _main_unlocked(argv=None):
             print("Error: --rebuild-source-ids requires --production.")
             return 2
         try:
-            rebuilt_count, rebuild_backup_batch = rebuild_source_id_markers(
-                daily_logs_dir,
-                vault_dir,
-                source_id_backup_root,
-                max_backup_batches=args.max_backup_batches,
-            )
-            print(f"Rebuilt Source ID markers in {rebuilt_count} source files.")
+            if args.dry_run:
+                rebuilt_count = 0
+                for root, _dirs, filenames in os.walk(daily_logs_dir):
+                    for filename in filenames:
+                        if not filename.casefold().endswith(".md"):
+                            continue
+                        filepath = os.path.join(root, filename)
+                        with open(filepath, encoding="utf-8", newline="") as file_obj:
+                            original = file_obj.read()
+                        rebuilt = replace_active_source_id_comments(original, "")
+                        preview_sources[filepath] = rebuilt
+                        rebuilt_count += rebuilt != original
+                print(f"Would rebuild Source ID markers in {rebuilt_count} source files.")
+            else:
+                rebuilt_count, rebuild_backup_batch = rebuild_source_id_markers(
+                    daily_logs_dir,
+                    vault_dir,
+                    source_id_backup_root,
+                    max_backup_batches=args.max_backup_batches,
+                )
+                print(f"Rebuilt Source ID markers in {rebuilt_count} source files.")
         except Exception as exc:
             print(f"Error: Source ID rebuild failed: {exc}")
             return 2
@@ -1801,6 +1840,7 @@ def _main_unlocked(argv=None):
                 new_indexes,
                 legacy_indexes,
                 allow_legacy_heading=allow_legacy_heading_fallback,
+                source_contents=preview_sources,
             )
             if args.dry_run:
                 for plan in marker_plans:
@@ -2014,9 +2054,17 @@ def _main_unlocked(argv=None):
                 entries[source_id] = entry_record
 
     stats["generated_files"] = len(desired_subjects)
+    try:
+        subject_paths = {
+            rel_path: resolve_generated_path(vault_dir, args.output_dir, rel_path)
+            for rel_path in desired_subjects
+        }
+    except ValueError as exc:
+        print(f"Error: {exc}")
+        return 2
     if not args.dry_run:
         for rel_path, content in desired_subjects.items():
-            full_path = os.path.join(vault_dir, rel_path)
+            full_path = subject_paths[rel_path]
             fs_full_path = filesystem_path(full_path)
             if os.path.isfile(fs_full_path):
                 try:
