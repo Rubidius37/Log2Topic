@@ -131,7 +131,7 @@ class InputSafetyTests(unittest.TestCase):
     def test_resolved_path_cannot_escape_through_symlink(self):
         # Mock resolution so this guard is also exercised without Windows symlink privileges.
         realpath = os.path.realpath
-        category = self.vault / "Subject" / "linked"
+        category = os.path.join(realpath(self.vault), "Subject", "linked")
         def resolve(path):
             if os.path.normcase(os.path.normpath(path)).startswith(
                 os.path.normcase(str(category)) + os.sep
