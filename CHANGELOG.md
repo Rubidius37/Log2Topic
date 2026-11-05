@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.1.3
+
+### 한국어 (Korean)
+- `--dry-run --rebuild-source-ids` 실행 시 원본, 생성 문서, 메타데이터와 백업을 변경하지 않고 결과를 미리 계산합니다.
+- 분류명과 출력 경로를 검증하여 Windows 예약 이름, 경로 이탈 및 심볼릭 링크를 통한 출력 폴더 외부 쓰기를 방지합니다.
+- Python CLI가 환경변수와 설정의 외부 작업 공간 경로를 사용하며, 외부 작업 공간에 예제 일지를 자동 생성하지 않습니다.
+- 안전성 회귀 테스트를 추가했습니다.
+
+### English
+- Preview `--dry-run --rebuild-source-ids` without modifying sources, generated documents, metadata, or backups.
+- Validate category names and output paths to prevent Windows reserved names, path traversal, and writes outside output folders through symbolic links.
+- Make the Python CLI honor external workspace paths from the environment or settings without seeding external workspaces with sample logs.
+- Add safety regression tests.
+
+### Validation
+- Windows: 269 tests run, one skipped because the host lacked permission to create symbolic links; build and packaged runtime startup smoke test passed.
+
 ## 1.1.2
 
 ### 한국어 (Korean)
